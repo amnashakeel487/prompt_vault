@@ -47,25 +47,25 @@ export default function SearchResults() {
   }, [query]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <section className="section-pad py-14">
+    <section className="section-pad py-8 sm:py-14">
       <SEO title="Search" description="Search the PromptVault prompt library." />
-      <h1 className="font-display text-3xl font-semibold text-ink">Search prompts</h1>
+      <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Search prompts</h1>
 
-      <div className="relative mt-6 max-w-xl">
-        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint" />
+      <div className="relative mt-5 sm:mt-6 max-w-xl">
+        <Search size={18} className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-ink-faint" />
         <input
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by title, category, tag, or description…"
-          className="w-full rounded-full border border-line bg-white/[0.03] py-3 pl-11 pr-4 text-sm text-ink placeholder:text-ink-faint outline-none transition focus:border-violet/50 focus:bg-white/[0.06]"
+          placeholder="Search by title, category, tag..."
+          className="w-full rounded-full border border-line bg-white/[0.03] py-2.5 sm:py-3 pl-10 sm:pl-11 pr-10 text-xs sm:text-sm text-ink placeholder:text-ink-faint outline-none transition focus:border-violet/50 focus:bg-white/[0.06]"
         />
         {loading && (
-          <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-violet-soft" />
+          <Loader2 size={16} className="absolute right-3.5 sm:right-4 top-1/2 -translate-y-1/2 animate-spin text-violet-soft" />
         )}
       </div>
 
-      <div className="mt-10">
+      <div className="mt-8 sm:mt-10">
         {!query.trim() ? (
           <EmptyState
             title="Start typing to search"
@@ -82,10 +82,10 @@ export default function SearchResults() {
           />
         ) : (
           <>
-            <p className="mb-5 text-sm text-ink-muted">
+            <p className="mb-4 sm:mb-5 text-xs sm:text-sm text-ink-muted">
               {results.length} result{results.length !== 1 && 's'}
             </p>
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {results.map((p, i) => (
                 <PromptCard key={p.id} prompt={p} index={i} />
               ))}

@@ -14,30 +14,30 @@ export default function Latest() {
   })
 
   return (
-    <section className="section-pad py-14">
+    <section className="section-pad py-8 sm:py-14">
       <SEO title="Latest Prompts" description="The newest prompts added to PromptVault." />
-      <h1 className="font-display text-3xl font-semibold text-ink">Latest prompts</h1>
-      <p className="mt-2 text-sm text-ink-muted">Freshly added, newest first.</p>
+      <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Latest prompts</h1>
+      <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-ink-muted">Freshly added, newest first.</p>
 
-      <div className="mt-8">
+      <div className="mt-6 sm:mt-8">
         {loading && prompts.length === 0 ? (
           <GridSkeleton count={6} />
         ) : prompts.length === 0 ? (
           <EmptyState title="No prompts found" description="New prompts will appear here as soon as they are published." />
         ) : (
           <>
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {prompts.map((p, i) => (
                 <PromptCard key={p.id} prompt={p} index={i} />
               ))}
             </div>
 
             {hasMore && (
-              <div className="mt-10 flex justify-center">
+              <div className="mt-8 sm:mt-10 flex justify-center">
                 <button
                   onClick={loadMore}
                   disabled={loading}
-                  className="btn-ghost !px-6 !py-2.5 text-sm"
+                  className="btn-ghost w-full sm:w-auto !px-6 !py-2.5 text-xs sm:text-sm justify-center"
                 >
                   {loading ? (
                     <span className="flex items-center gap-2">

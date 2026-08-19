@@ -62,7 +62,7 @@
     @apply text-amber font-mono;
   }
   .section-pad {
-    @apply px-6 md:px-10 lg:px-16;
+    @apply px-4 sm:px-6 md:px-10 lg:px-16;
   }
   .skeleton {
     @apply relative overflow-hidden bg-surface-2 rounded-xl2;

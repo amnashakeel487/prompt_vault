@@ -11,16 +11,16 @@ export default function VariableForm({ variables, onGenerate }) {
 
   if (variables.length === 0) {
     return (
-      <div className="glass-card p-5 text-sm text-ink-muted">
+      <div className="glass-card p-4 sm:p-5 text-xs sm:text-sm text-ink-muted">
         This prompt has no variables — it's ready to copy as-is.
       </div>
     )
   }
 
   return (
-    <form onSubmit={handleSubmit(onGenerate)} className="glass-card p-5 space-y-4">
-      <h3 className="font-display font-semibold text-ink">Fill in the variables</h3>
-      <div className="grid gap-4 sm:grid-cols-2">
+    <form onSubmit={handleSubmit(onGenerate)} className="glass-card p-4 sm:p-6 space-y-4">
+      <h3 className="font-display font-semibold text-ink text-base sm:text-lg">Fill in the variables</h3>
+      <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
         {variables.map((name) => (
           <div key={name} className="flex flex-col gap-1.5">
             <label htmlFor={name} className="text-xs font-medium text-ink-muted">
@@ -30,12 +30,12 @@ export default function VariableForm({ variables, onGenerate }) {
               id={name}
               {...register(name)}
               placeholder={`e.g. ${toLabel(name)}`}
-              className="rounded-lg border border-line bg-white/[0.03] px-3 py-2 text-sm text-ink placeholder:text-ink-faint outline-none transition focus:border-violet/50 focus:bg-white/[0.06]"
+              className="rounded-lg border border-line bg-white/[0.03] px-3.5 py-2.5 text-xs sm:text-sm text-ink placeholder:text-ink-faint outline-none transition focus:border-violet/50 focus:bg-white/[0.06]"
             />
           </div>
         ))}
       </div>
-      <button type="submit" className="btn-primary">
+      <button type="submit" className="btn-primary w-full sm:w-auto justify-center">
         <Wand2 size={16} /> Generate prompt
       </button>
     </form>

@@ -31,29 +31,29 @@ export default function Contact() {
   }
 
   return (
-    <section className="section-pad py-16 max-w-2xl mx-auto">
+    <section className="section-pad py-8 sm:py-16 max-w-2xl mx-auto">
       <SEO title="Contact" description="Get in touch with the PromptVault team." />
-      <h1 className="font-display text-3xl font-semibold text-ink">Contact us</h1>
-      <p className="mt-2 text-sm text-ink-muted">
+      <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Contact us</h1>
+      <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-ink-muted">
         Questions, prompt requests, or partnership ideas — send them over.
       </p>
 
       {sent && (
-        <div className="mt-6 flex items-center gap-2.5 rounded-xl border border-cyan/40 bg-cyan/10 p-4 text-xs text-cyan animate-fadeIn">
-          <CheckCircle2 size={18} />
+        <div className="mt-5 sm:mt-6 flex items-center gap-2.5 rounded-xl border border-cyan/40 bg-cyan/10 p-3.5 sm:p-4 text-xs text-cyan animate-fadeIn">
+          <CheckCircle2 size={18} className="shrink-0" />
           <span>Thank you! Your message has been received and our team will get back to you soon.</span>
         </div>
       )}
 
       {error && (
-        <div className="mt-6 flex items-center gap-2.5 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-xs text-red-300 animate-fadeIn">
-          <AlertCircle size={18} />
+        <div className="mt-5 sm:mt-6 flex items-center gap-2.5 rounded-xl border border-red-500/40 bg-red-500/10 p-3.5 sm:p-4 text-xs text-red-300 animate-fadeIn">
+          <AlertCircle size={18} className="shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="glass-card mt-8 p-6 space-y-4 shadow-glow">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit(onSubmit)} className="glass-card mt-6 sm:mt-8 p-4 sm:p-6 space-y-4 shadow-glow">
+        <div className="grid gap-3.5 sm:gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-ink-muted">Name *</label>
             <input
@@ -61,7 +61,7 @@ export default function Contact() {
               required
               disabled={submitting}
               placeholder="Your name"
-              className="rounded-lg border border-line bg-white/[0.03] px-3.5 py-2.5 text-xs text-ink outline-none focus:border-violet/50 disabled:opacity-50"
+              className="rounded-lg border border-line bg-white/[0.03] px-3.5 py-2.5 text-xs sm:text-sm text-ink outline-none focus:border-violet/50 disabled:opacity-50"
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -74,7 +74,7 @@ export default function Contact() {
                 required
                 disabled={submitting}
                 placeholder="your@email.com"
-                className="w-full rounded-lg border border-line bg-white/[0.03] py-2.5 pl-9 pr-3.5 text-xs text-ink outline-none focus:border-violet/50 disabled:opacity-50"
+                className="w-full rounded-lg border border-line bg-white/[0.03] py-2.5 pl-9 pr-3.5 text-xs sm:text-sm text-ink outline-none focus:border-violet/50 disabled:opacity-50"
               />
             </div>
           </div>
@@ -88,11 +88,11 @@ export default function Contact() {
             required
             disabled={submitting}
             placeholder="Tell us what's on your mind, request a prompt, or suggest a new category..."
-            className="rounded-lg border border-line bg-white/[0.03] px-3.5 py-2.5 text-xs text-ink outline-none focus:border-violet/50 disabled:opacity-50"
+            className="rounded-lg border border-line bg-white/[0.03] px-3.5 py-2.5 text-xs sm:text-sm text-ink outline-none focus:border-violet/50 disabled:opacity-50"
           />
         </div>
 
-        <button type="submit" disabled={submitting} className="btn-primary">
+        <button type="submit" disabled={submitting} className="btn-primary w-full sm:w-auto justify-center">
           {submitting ? (
             <span className="flex items-center gap-2">
               <Loader2 size={16} className="animate-spin" /> Sending message...

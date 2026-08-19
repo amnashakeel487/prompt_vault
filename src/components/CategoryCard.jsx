@@ -46,14 +46,16 @@ export default function CategoryCard({ category, index = 0 }) {
     >
       <Link
         to={`/category/${category.slug}`}
-        className="glass-card group flex items-center gap-4 p-5 transition-all hover:-translate-y-1 hover:shadow-glow"
+        className="glass-card group flex items-center gap-3.5 sm:gap-4 p-4 sm:p-5 min-h-[64px] transition-all hover:-translate-y-1 hover:shadow-glow"
       >
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet/20 to-cyan/10 border border-line text-violet-soft transition-colors group-hover:text-cyan">
-          <Icon size={20} />
+        <span className="grid h-10 w-10 sm:h-11 sm:w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet/20 to-cyan/10 border border-line text-violet-soft transition-colors group-hover:text-cyan">
+          <Icon size={18} className="sm:w-5 sm:h-5" />
         </span>
-        <div>
-          <h3 className="font-display font-semibold text-ink">{category.name}</h3>
-          <p className="text-xs text-ink-faint">{category.count ?? 0} prompts</p>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-display font-semibold text-sm sm:text-base text-ink truncate group-hover:text-violet-soft transition-colors">
+            {category.name}
+          </h3>
+          <p className="text-[11px] sm:text-xs text-ink-faint">{category.count ?? 0} prompts</p>
         </div>
       </Link>
     </motion.div>

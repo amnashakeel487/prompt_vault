@@ -74,7 +74,7 @@ export default function CategoryDetail() {
 
   if (loadingCategory) {
     return (
-      <section className="section-pad py-14">
+      <section className="section-pad py-8 sm:py-14">
         <div className="h-8 w-48 skeleton mb-4 rounded" />
         <div className="h-4 w-32 skeleton mb-8 rounded" />
         <GridSkeleton count={6} />
@@ -84,21 +84,21 @@ export default function CategoryDetail() {
 
   if (!category) {
     return (
-      <section className="section-pad py-20">
+      <section className="section-pad py-16 sm:py-20">
         <EmptyState title="Category not found" description="This category may have been renamed or removed." />
       </section>
     )
   }
 
   return (
-    <section className="section-pad py-14">
+    <section className="section-pad py-8 sm:py-14">
       <SEO
         title={category.name}
         description={`Browse ${category.name} prompts in the PromptVault library.`}
         canonical={typeof window !== 'undefined' ? window.location.href : undefined}
       />
 
-      <nav className="mb-6 flex items-center gap-1.5 text-xs text-ink-faint">
+      <nav className="mb-4 sm:mb-6 flex flex-wrap items-center gap-1.5 text-[11px] sm:text-xs text-ink-faint">
         <Link to="/" className="hover:text-ink-muted">Home</Link>
         <ChevronRight size={12} />
         <Link to="/categories" className="hover:text-ink-muted">Categories</Link>
@@ -106,14 +106,14 @@ export default function CategoryDetail() {
         <span className="text-ink-muted">{category.name}</span>
       </nav>
 
-      <h1 className="font-display text-3xl font-semibold text-ink">{category.name}</h1>
-      <p className="mt-2 text-sm text-ink-muted">{prompts.length} prompts in this view.</p>
+      <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">{category.name}</h1>
+      <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-ink-muted">{prompts.length} prompts in this view.</p>
 
       {subcategories.length > 0 && (
-        <div className="mt-6 flex flex-wrap gap-2">
+        <div className="mt-5 sm:mt-6 flex flex-wrap gap-1.5 sm:gap-2">
           <button
             onClick={() => setActiveSub('all')}
-            className={`chip transition-colors cursor-pointer ${
+            className={`chip transition-colors cursor-pointer text-xs py-1.5 px-3.5 ${
               activeSub === 'all'
                 ? '!border-violet/40 !bg-violet/15 !text-violet-soft'
                 : 'hover:text-white'
@@ -125,7 +125,7 @@ export default function CategoryDetail() {
             <button
               key={s.id}
               onClick={() => setActiveSub(s.id)}
-              className={`chip transition-colors cursor-pointer ${
+              className={`chip transition-colors cursor-pointer text-xs py-1.5 px-3.5 ${
                 activeSub === s.id
                   ? '!border-violet/40 !bg-violet/15 !text-violet-soft'
                   : 'hover:text-white'
@@ -137,13 +137,13 @@ export default function CategoryDetail() {
         </div>
       )}
 
-      <div className="mt-8">
+      <div className="mt-6 sm:mt-8">
         {loadingPrompts ? (
           <GridSkeleton count={6} />
         ) : prompts.length === 0 ? (
           <EmptyState title="No prompts yet" description="Check back soon — new prompts are added weekly." />
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {prompts.map((p, i) => (
               <PromptCard key={p.id} prompt={p} index={i} />
             ))}

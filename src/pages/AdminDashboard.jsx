@@ -737,25 +737,25 @@ export default function AdminDashboard() {
       </aside>
 
       {/* ======================= MAIN CONTENT VIEW ======================= */}
-      <main className="flex-1 overflow-x-hidden p-6 md:p-10">
+      <main className="flex-1 overflow-x-hidden p-4 sm:p-6 md:p-10">
         {/* Top Action Bar */}
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div className="mb-6 sm:mb-8 flex flex-wrap items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-line text-ink-muted hover:text-white lg:hidden"
+              className="grid h-10 w-10 place-items-center rounded-xl border border-line text-ink-muted hover:text-white lg:hidden"
             >
               <Menu size={18} />
             </button>
             <div>
-              <h1 className="font-display text-2xl font-semibold text-ink capitalize tracking-tight">
+              <h1 className="font-display text-xl sm:text-2xl font-semibold text-ink capitalize tracking-tight">
                 {activeTab === 'prompts' && 'Prompts Library'}
                 {activeTab === 'categories' && 'Categories & Taxonomies'}
                 {activeTab === 'messages' && 'Contact Submissions & Inbox'}
                 {activeTab === 'analytics' && 'Vault Analytics & Metrics'}
                 {activeTab === 'profile' && 'Admin Profile & Security'}
               </h1>
-              <p className="text-xs text-ink-muted mt-0.5">
+              <p className="text-[11px] sm:text-xs text-ink-muted mt-0.5">
                 {activeTab === 'prompts' && 'Manage, publish, edit, and organize all prompts.'}
                 {activeTab === 'categories' && 'Create topic categories and subcategory tags.'}
                 {activeTab === 'messages' && 'Read inquiries, prompt requests, and feedback from visitors.'}
@@ -766,26 +766,26 @@ export default function AdminDashboard() {
           </div>
 
           {/* Quick Header Actions */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <button
               onClick={handleRefresh}
               disabled={refreshing}
               title="Refresh Data"
-              className="btn-ghost !px-3 !py-2 text-xs flex items-center gap-1.5"
+              className="btn-ghost !px-3 !py-2 text-xs flex items-center gap-1.5 min-h-[40px]"
             >
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
 
             {activeTab === 'prompts' && (
-              <button onClick={openNewPromptModal} className="btn-primary !px-4 !py-2 text-xs flex items-center gap-1.5 shadow-glow">
-                <Plus size={14} /> Add Prompt
+              <button onClick={openNewPromptModal} className="btn-primary !px-3.5 sm:!px-4 !py-2 text-xs flex items-center gap-1.5 shadow-glow min-h-[40px]">
+                <Plus size={14} /> <span className="hidden sm:inline">Add Prompt</span><span className="sm:hidden">New</span>
               </button>
             )}
 
             {activeTab === 'categories' && (
-              <button onClick={openNewCatModal} className="btn-primary !px-4 !py-2 text-xs flex items-center gap-1.5 shadow-glow">
-                <Plus size={14} /> Add Category
+              <button onClick={openNewCatModal} className="btn-primary !px-3.5 sm:!px-4 !py-2 text-xs flex items-center gap-1.5 shadow-glow min-h-[40px]">
+                <Plus size={14} /> <span className="hidden sm:inline">Add Category</span><span className="sm:hidden">New</span>
               </button>
             )}
           </div>
@@ -808,12 +808,12 @@ export default function AdminDashboard() {
         {/* ======================= TAB 1: PROMPTS ======================= */}
         {activeTab === 'prompts' && (
           <div className="space-y-6">
-            {/* KPI Cards Row */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* KPI Cards Row (2 columns on mobile!) */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <StatCard
                 title="Total Prompts"
                 value={stats.totalPrompts}
-                sublabel={`${promptsList.filter((p) => p.status === 'published').length} Published live`}
+                sublabel={`${promptsList.filter((p) => p.status === 'published').length} Published`}
                 icon={FileText}
                 gradient="from-violet/20 to-violet/5"
               />
@@ -827,14 +827,14 @@ export default function AdminDashboard() {
               <StatCard
                 title="Total Views"
                 value={stats.totalViews.toLocaleString()}
-                sublabel="Impressions recorded"
+                sublabel="Impressions"
                 icon={Eye}
                 gradient="from-amber/20 to-amber/5"
               />
               <StatCard
                 title="Copies Generated"
                 value={stats.totalCopies.toLocaleString()}
-                sublabel="Direct user utility"
+                sublabel="User copies"
                 icon={Copy}
                 gradient="from-emerald-500/20 to-emerald-500/5"
               />
@@ -883,148 +883,240 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Prompts Table */}
+            {/* Prompts Container */}
             <div className="glass-card overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b border-line bg-white/[0.02] text-ink-faint uppercase font-mono tracking-wider">
-                    <tr>
-                      <th className="px-5 py-3.5">Prompt Details</th>
-                      <th className="px-5 py-3.5">Category</th>
-                      <th className="px-5 py-3.5">Status</th>
-                      <th className="px-5 py-3.5 text-center">Views</th>
-                      <th className="px-5 py-3.5 text-center">Copies</th>
-                      <th className="px-5 py-3.5 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line/40">
-                    {loading ? (
-                      <tr>
-                        <td colSpan={6} className="px-5 py-12 text-center text-ink-faint">
-                          <Loader2 size={24} className="mx-auto mb-2 animate-spin text-violet-soft" />
-                          Fetching prompt library from Supabase...
-                        </td>
-                      </tr>
-                    ) : filteredPrompts.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-5 py-12 text-center text-ink-muted">
-                          <div className="max-w-xs mx-auto space-y-2">
-                            <p className="font-semibold text-ink">No prompts found</p>
-                            <p className="text-ink-faint text-[11px]">
-                              Try adjusting your filters or click below to create a new prompt.
-                            </p>
-                            <button onClick={openNewPromptModal} className="btn-primary !px-3 !py-1.5 text-xs mt-2">
-                              <Plus size={13} /> Create Prompt
+              {loading ? (
+                <div className="px-5 py-12 text-center text-ink-faint">
+                  <Loader2 size={24} className="mx-auto mb-2 animate-spin text-violet-soft" />
+                  Fetching prompt library from Supabase...
+                </div>
+              ) : filteredPrompts.length === 0 ? (
+                <div className="px-5 py-12 text-center text-ink-muted">
+                  <div className="max-w-xs mx-auto space-y-2">
+                    <p className="font-semibold text-ink">No prompts found</p>
+                    <p className="text-ink-faint text-[11px]">
+                      Try adjusting your filters or click below to create a new prompt.
+                    </p>
+                    <button onClick={openNewPromptModal} className="btn-primary !px-3 !py-1.5 text-xs mt-2">
+                      <Plus size={13} /> Create Prompt
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* MOBILE VIEW (< md): Card List */}
+                  <div className="md:hidden divide-y divide-line/40">
+                    {filteredPrompts.map((p) => {
+                      const cat = categoriesList.find((c) => c.id === p.categoryId || c.id === p.category_id)
+                      return (
+                        <div key={p.id} className="p-4 space-y-3">
+                          <div className="flex items-start gap-3">
+                            {p.featuredImage ? (
+                              <img
+                                src={p.featuredImage}
+                                alt={p.title}
+                                className="h-12 w-14 rounded-lg object-cover border border-line shrink-0"
+                              />
+                            ) : (
+                              <div className="h-12 w-14 rounded-lg bg-surface border border-line flex items-center justify-center text-ink-faint shrink-0">
+                                <FileText size={16} />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-medium text-ink text-xs line-clamp-1">
+                                  {p.title}
+                                </span>
+                                {p.featured && (
+                                  <span className="rounded bg-violet/20 px-1 py-0.5 text-[9px] text-violet-soft border border-violet/30">
+                                    Featured
+                                  </span>
+                                )}
+                                {p.trending && (
+                                  <span className="rounded bg-amber/20 px-1 py-0.5 text-[9px] text-amber border border-amber/30 flex items-center gap-0.5">
+                                    <Flame size={9} /> Hot
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] font-mono text-ink-faint mt-0.5 truncate">
+                                /{p.slug} • {p.variables?.length || 0} vars
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1 text-[11px] text-ink-muted">
+                            <span className="inline-flex items-center rounded-full border border-line bg-white/[0.03] px-2 py-0.5 text-[10px]">
+                              {cat?.name || 'Uncategorized'}
+                            </span>
+                            <button
+                              onClick={() => handleTogglePromptStatus(p)}
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium border ${
+                                p.status === 'published'
+                                  ? 'bg-cyan/10 text-cyan border-cyan/30'
+                                  : 'bg-amber/10 text-amber border-amber/30'
+                              }`}
+                            >
+                              <span className={`h-1.5 w-1.5 rounded-full ${p.status === 'published' ? 'bg-cyan' : 'bg-amber'}`} />
+                              <span className="capitalize">{p.status}</span>
                             </button>
                           </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredPrompts.map((p) => {
-                        const cat = categoriesList.find((c) => c.id === p.categoryId || c.id === p.category_id)
-                        return (
-                          <tr key={p.id} className="hover:bg-white/[0.02] transition-colors group">
-                            <td className="px-5 py-4">
-                              <div className="flex items-center gap-3">
-                                {p.featuredImage ? (
-                                  <img
-                                    src={p.featuredImage}
-                                    alt={p.title}
-                                    className="h-10 w-14 rounded-lg object-cover border border-line shrink-0"
-                                  />
-                                ) : (
-                                  <div className="h-10 w-14 rounded-lg bg-surface border border-line flex items-center justify-center text-ink-faint shrink-0">
-                                    <FileText size={16} />
-                                  </div>
-                                )}
-                                <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-medium text-ink text-sm group-hover:text-violet-soft transition-colors">
-                                      {p.title}
-                                    </span>
-                                    {p.featured && (
-                                      <span className="rounded bg-violet/20 px-1.5 py-0.5 text-[10px] text-violet-soft border border-violet/30">
-                                        Featured
+
+                          <div className="flex items-center justify-between border-t border-line/40 pt-2 text-[11px] text-ink-faint">
+                            <div className="flex items-center gap-3">
+                              <span>{(p.views || 0).toLocaleString()} views</span>
+                              <span>{(p.copies || 0).toLocaleString()} copies</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <a
+                                href={`/prompt/${p.slug}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-white"
+                                title="Preview"
+                              >
+                                <ExternalLink size={13} />
+                              </a>
+                              <button
+                                onClick={() => openEditPromptModal(p)}
+                                className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-violet-soft"
+                                title="Edit"
+                              >
+                                <Pencil size={13} />
+                              </button>
+                              <button
+                                onClick={() => handleDeletePrompt(p.id, p.title)}
+                                className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-red-400"
+                                title="Delete"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* DESKTOP VIEW (>= md): Full Table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="border-b border-line bg-white/[0.02] text-ink-faint uppercase font-mono tracking-wider">
+                        <tr>
+                          <th className="px-5 py-3.5">Prompt Details</th>
+                          <th className="px-5 py-3.5">Category</th>
+                          <th className="px-5 py-3.5">Status</th>
+                          <th className="px-5 py-3.5 text-center">Views</th>
+                          <th className="px-5 py-3.5 text-center">Copies</th>
+                          <th className="px-5 py-3.5 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-line/40">
+                        {filteredPrompts.map((p) => {
+                          const cat = categoriesList.find((c) => c.id === p.categoryId || c.id === p.category_id)
+                          return (
+                            <tr key={p.id} className="hover:bg-white/[0.02] transition-colors group">
+                              <td className="px-5 py-4">
+                                <div className="flex items-center gap-3">
+                                  {p.featuredImage ? (
+                                    <img
+                                      src={p.featuredImage}
+                                      alt={p.title}
+                                      className="h-10 w-14 rounded-lg object-cover border border-line shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="h-10 w-14 rounded-lg bg-surface border border-line flex items-center justify-center text-ink-faint shrink-0">
+                                      <FileText size={16} />
+                                    </div>
+                                  )}
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-medium text-ink text-sm group-hover:text-violet-soft transition-colors">
+                                        {p.title}
                                       </span>
-                                    )}
-                                    {p.trending && (
-                                      <span className="rounded bg-amber/20 px-1.5 py-0.5 text-[10px] text-amber border border-amber/30 flex items-center gap-0.5">
-                                        <Flame size={10} /> Hot
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-ink-faint">
-                                    <span className="font-mono">/{p.slug}</span>
-                                    <span>•</span>
-                                    <span>{p.variables?.length || 0} variables</span>
+                                      {p.featured && (
+                                        <span className="rounded bg-violet/20 px-1.5 py-0.5 text-[10px] text-violet-soft border border-violet/30">
+                                          Featured
+                                        </span>
+                                      )}
+                                      {p.trending && (
+                                        <span className="rounded bg-amber/20 px-1.5 py-0.5 text-[10px] text-amber border border-amber/30 flex items-center gap-0.5">
+                                          <Flame size={10} /> Hot
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-ink-faint">
+                                      <span className="font-mono">/{p.slug}</span>
+                                      <span>•</span>
+                                      <span>{p.variables?.length || 0} variables</span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </td>
+                              </td>
 
-                            <td className="px-5 py-4">
-                              <span className="inline-flex items-center gap-1 rounded-full border border-line bg-white/[0.03] px-2.5 py-1 text-xs text-ink-muted">
-                                {cat?.name || 'Uncategorized'}
-                              </span>
-                            </td>
+                              <td className="px-5 py-4">
+                                <span className="inline-flex items-center gap-1 rounded-full border border-line bg-white/[0.03] px-2.5 py-1 text-xs text-ink-muted">
+                                  {cat?.name || 'Uncategorized'}
+                                </span>
+                              </td>
 
-                            <td className="px-5 py-4">
-                              <button
-                                onClick={() => handleTogglePromptStatus(p)}
-                                title="Click to toggle published status"
-                                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer transition-all border ${
-                                  p.status === 'published'
-                                    ? 'bg-cyan/10 text-cyan border-cyan/30 hover:bg-cyan/20'
-                                    : 'bg-amber/10 text-amber border-amber/30 hover:bg-amber/20'
-                                }`}
-                              >
-                                <span className={`h-1.5 w-1.5 rounded-full ${p.status === 'published' ? 'bg-cyan' : 'bg-amber'}`} />
-                                <span className="capitalize">{p.status}</span>
-                              </button>
-                            </td>
-
-                            <td className="px-5 py-4 text-center font-mono text-ink-muted">
-                              {(p.views || 0).toLocaleString()}
-                            </td>
-
-                            <td className="px-5 py-4 text-center font-mono text-ink-muted">
-                              {(p.copies || 0).toLocaleString()}
-                            </td>
-
-                            <td className="px-5 py-4 text-right">
-                              <div className="flex items-center justify-end gap-1.5">
-                                <a
-                                  href={`/prompt/${p.slug}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title="Preview live prompt"
-                                  className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-white hover:border-violet/40 transition-colors"
-                                >
-                                  <ExternalLink size={14} />
-                                </a>
+                              <td className="px-5 py-4">
                                 <button
-                                  onClick={() => openEditPromptModal(p)}
-                                  title="Edit prompt"
-                                  className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-violet-soft hover:border-violet/40 transition-colors"
+                                  onClick={() => handleTogglePromptStatus(p)}
+                                  title="Click to toggle published status"
+                                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer transition-all border ${
+                                    p.status === 'published'
+                                      ? 'bg-cyan/10 text-cyan border-cyan/30 hover:bg-cyan/20'
+                                      : 'bg-amber/10 text-amber border-amber/30 hover:bg-amber/20'
+                                  }`}
                                 >
-                                  <Pencil size={14} />
+                                  <span className={`h-1.5 w-1.5 rounded-full ${p.status === 'published' ? 'bg-cyan' : 'bg-amber'}`} />
+                                  <span className="capitalize">{p.status}</span>
                                 </button>
-                                <button
-                                  onClick={() => handleDeletePrompt(p.id, p.title)}
-                                  title="Delete prompt"
-                                  className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-red-400 hover:border-red-400/40 transition-colors"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                              </td>
+
+                              <td className="px-5 py-4 text-center font-mono text-ink-muted">
+                                {(p.views || 0).toLocaleString()}
+                              </td>
+
+                              <td className="px-5 py-4 text-center font-mono text-ink-muted">
+                                {(p.copies || 0).toLocaleString()}
+                              </td>
+
+                              <td className="px-5 py-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <a
+                                    href={`/prompt/${p.slug}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title="Preview live prompt"
+                                    className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-white hover:border-violet/40 transition-colors"
+                                  >
+                                    <ExternalLink size={14} />
+                                  </a>
+                                  <button
+                                    onClick={() => openEditPromptModal(p)}
+                                    title="Edit prompt"
+                                    className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-violet-soft hover:border-violet/40 transition-colors"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeletePrompt(p.id, p.title)}
+                                    title="Delete prompt"
+                                    className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-red-400 hover:border-red-400/40 transition-colors"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -1394,18 +1486,18 @@ export default function AdminDashboard() {
 
       {/* ======================= MODAL: ADD / EDIT PROMPT ======================= */}
       {showPromptModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
-          <div className="glass-card w-full max-w-3xl p-6 md:p-8 relative max-h-[90vh] overflow-y-auto animate-fadeIn border-violet/30 shadow-glow">
-            <div className="flex items-center justify-between border-b border-line pb-4 mb-6">
-              <div className="flex items-center gap-2.5">
-                <span className="grid h-8 w-8 place-items-center rounded-lg bg-violet/20 text-violet-soft border border-violet/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+          <div className="glass-card w-full max-w-3xl p-4 sm:p-6 md:p-8 relative max-h-[90vh] overflow-y-auto animate-fadeIn border-violet/30 shadow-glow">
+            <div className="flex items-center justify-between border-b border-line pb-3 sm:pb-4 mb-4 sm:mb-6">
+              <div className="flex items-center gap-2 sm:gap-2.5">
+                <span className="grid h-8 w-8 place-items-center rounded-lg bg-violet/20 text-violet-soft border border-violet/30 shrink-0">
                   <FileText size={16} />
                 </span>
                 <div>
-                  <h2 className="font-display font-semibold text-lg text-ink">
+                  <h2 className="font-display font-semibold text-base sm:text-lg text-ink">
                     {editingPromptId ? 'Edit Prompt' : 'Create New Prompt'}
                   </h2>
-                  <p className="text-xs text-ink-muted">Define prompt parameters, auto-variables, and SEO tags.</p>
+                  <p className="text-[11px] sm:text-xs text-ink-muted">Define prompt parameters, auto-variables, and SEO tags.</p>
                 </div>
               </div>
               <button
@@ -1631,12 +1723,12 @@ export default function AdminDashboard() {
 
       {/* ======================= MODAL: ADD / EDIT CATEGORY ======================= */}
       {showCatModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-md p-6 relative animate-fadeIn border-violet/30 shadow-glow">
-            <div className="flex items-center justify-between border-b border-line pb-3 mb-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm">
+          <div className="glass-card w-full max-w-md p-4 sm:p-6 relative animate-fadeIn border-violet/30 shadow-glow max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-line pb-3 mb-4 sm:mb-5">
               <div className="flex items-center gap-2">
                 <FolderKanban size={18} className="text-violet-soft" />
-                <h3 className="font-display font-semibold text-ink">
+                <h3 className="font-display font-semibold text-sm sm:text-base text-ink">
                   {editingCatId ? 'Edit Category' : 'Create New Category'}
                 </h3>
               </div>

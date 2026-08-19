@@ -6,15 +6,15 @@ import { Zap, Search, Menu, X } from 'lucide-react'
 // Each nav item: `to` is the fallback page route, `hash` is the section id on Home
 const links = [
   { to: '/categories', label: 'Categories', hash: 'categories' },
-  { to: '/latest',     label: 'Latest',     hash: 'latest'     },
-  { to: '/popular',    label: 'Popular',    hash: 'popular'    },
+  { to: '/latest', label: 'Latest', hash: 'latest' },
+  { to: '/popular', label: 'Popular', hash: 'popular' },
 ]
 
 function scrollToSection(hash) {
   const el = document.getElementById(hash)
   if (el) {
-    const navHeight = 64 // sticky navbar height in px
-    const top = el.getBoundingClientRect().top + window.scrollY - navHeight - 16
+    const navHeight = 60 // responsive sticky navbar height in px
+    const top = el.getBoundingClientRect().top + window.scrollY - navHeight - 12
     window.scrollTo({ top, behavior: 'smooth' })
     return true
   }
@@ -29,28 +29,12 @@ export default function Navbar() {
 
   const isHome = location.pathname === '/'
 
-  function handleNavClick(e, link) {
-    e.preventDefault()
-    setOpen(false)
-
-    if (isHome) {
-      // Already on home — just smooth-scroll to section
-      scrollToSection(link.hash)
-    } else {
-      // Navigate to home first, then scroll after the page mounts
-      navigate('/', { state: { scrollTo: link.hash } })
-    }
-  }
-
   function submitSearch(e) {
     e.preventDefault()
     if (q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`)
     setOpen(false)
   }
 
-  // After navigating to home, scroll to the target section
-  // (handled via useEffect in the links themselves — the state is read in Home)
-  // Simpler: just use hash navigation after push
   function handleNavClickSimple(e, link) {
     e.preventDefault()
     setOpen(false)
@@ -58,22 +42,22 @@ export default function Navbar() {
     if (isHome) {
       scrollToSection(link.hash)
     } else {
-      // Navigate to home with hash so browser auto-scrolls
       navigate(`/#${link.hash}`)
-      // Give the page time to mount, then scroll
-      setTimeout(() => scrollToSection(link.hash), 300)
+      setTimeout(() => scrollToSection(link.hash), 350)
     }
   }
 
   return (
     <header className="sticky top-0 z-50">
       <div className="glass border-b border-line">
-        <div className="section-pad flex h-16 items-center justify-between gap-4">
-          <Link to="/" className="flex items-center gap-2 shrink-0">
+        <div className="section-pad flex h-14 sm:h-16 items-center justify-between gap-3">
+          <Link to="/" className="flex items-center gap-2 shrink-0 min-h-[44px]">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-violet to-cyan shadow-glow">
               <Zap size={16} className="text-base" strokeWidth={2.5} />
             </span>
-            <span className="font-display text-lg font-semibold tracking-tight">PromptVault</span>
+            <span className="font-display text-base sm:text-lg font-semibold tracking-tight text-ink">
+              PromptVault
+            </span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">
@@ -99,7 +83,12 @@ export default function Navbar() {
             />
           </form>
 
-          <button className="md:hidden text-ink" onClick={() => setOpen((v) => !v)} aria-label="Toggle menu">
+          {/* Mobile hamburger button with min 44x44px touch target */}
+          <button
+            className="md:hidden flex h-11 w-11 items-center justify-center rounded-lg text-ink transition-colors hover:bg-white/[0.05]"
+            onClick={() => setOpen((v) => !v)}
+            aria-label="Toggle menu"
+          >
             {open ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
@@ -111,28 +100,31 @@ export default function Navbar() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="md:hidden glass border-b border-line overflow-hidden"
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className="md:hidden glass border-b border-line overflow-hidden shadow-2xl"
           >
             <div className="section-pad py-4 flex flex-col gap-3">
               <form onSubmit={submitSearch} className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" />
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="Search prompts…"
-                  className="w-full rounded-full border border-line bg-white/[0.03] py-2 pl-9 pr-4 text-sm outline-none"
+                  className="w-full rounded-lg border border-line bg-white/[0.04] py-2.5 pl-10 pr-3.5 text-sm text-ink placeholder:text-ink-faint outline-none focus:border-violet/50"
                 />
               </form>
-              {links.map((l) => (
-                <a
-                  key={l.to}
-                  href={`/#${l.hash}`}
-                  onClick={(e) => handleNavClickSimple(e, l)}
-                  className="text-sm text-ink-muted hover:text-white"
-                >
-                  {l.label}
-                </a>
-              ))}
+              <div className="flex flex-col divide-y divide-line/30 pt-1">
+                {links.map((l) => (
+                  <a
+                    key={l.to}
+                    href={`/#${l.hash}`}
+                    onClick={(e) => handleNavClickSimple(e, l)}
+                    className="flex items-center min-h-[44px] py-2.5 text-sm font-medium text-ink-muted hover:text-white transition-colors"
+                  >
+                    {l.label}
+                  </a>
+                ))}
+              </div>
             </div>
           </motion.div>
         )}

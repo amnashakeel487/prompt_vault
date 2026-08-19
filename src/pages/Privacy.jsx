@@ -2,10 +2,10 @@ import SEO from '../components/SEO'
 
 export default function Privacy() {
   return (
-    <section className="section-pad py-16 max-w-3xl mx-auto">
+    <section className="section-pad py-8 sm:py-16 max-w-3xl mx-auto">
       <SEO title="Privacy Policy" description="PromptVault privacy policy." />
-      <h1 className="font-display text-3xl font-semibold text-ink">Privacy Policy</h1>
-      <div className="mt-6 space-y-5 text-sm leading-relaxed text-ink-muted">
+      <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Privacy Policy</h1>
+      <div className="mt-5 sm:mt-6 space-y-4 sm:space-y-5 text-xs sm:text-sm leading-relaxed text-ink-muted">
         <p>PromptVault does not require an account to browse or copy prompts. We collect minimal analytics
           (page views and copy counts) to understand which prompts are useful.</p>
         <p>We do not sell personal data. Any values you type into a prompt's variable form stay in your

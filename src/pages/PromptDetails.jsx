@@ -88,7 +88,7 @@ export default function PromptDetails() {
   }
 
   return (
-    <section className="section-pad py-12">
+    <section className="section-pad py-8 sm:py-12">
       <SEO
         title={prompt.seoTitle || prompt.title}
         description={prompt.seoDescription || prompt.description}
@@ -100,7 +100,7 @@ export default function PromptDetails() {
         author={prompt.author || 'Admin'}
       />
 
-      <nav className="mb-6 flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
+      <nav className="mb-4 sm:mb-6 flex flex-wrap items-center gap-1.5 text-[11px] sm:text-xs text-ink-faint">
         <Link to="/" className="hover:text-ink-muted">Home</Link>
         <ChevronRight size={12} />
         {category && (
@@ -111,17 +111,17 @@ export default function PromptDetails() {
             <ChevronRight size={12} />
           </>
         )}
-        <span className="text-ink-muted line-clamp-1">{prompt.title}</span>
+        <span className="text-ink-muted truncate max-w-[200px] sm:max-w-none">{prompt.title}</span>
       </nav>
 
-      <div className="grid gap-10 lg:grid-cols-[1fr_340px]">
+      <div className="grid gap-8 lg:gap-10 lg:grid-cols-[1fr_340px]">
         <div>
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            <h1 className="font-display text-3xl md:text-4xl font-semibold text-ink leading-tight">
+            <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-semibold text-ink leading-tight break-words">
               {prompt.title}
             </h1>
 
-            <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-ink-faint">
+            <div className="mt-3 sm:mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] sm:text-xs text-ink-faint">
               <span className="flex items-center gap-1.5"><User size={13} /> {prompt.author || 'Admin'}</span>
               <span className="flex items-center gap-1.5"><Calendar size={13} /> Updated {formattedDate}</span>
               <span className="flex items-center gap-1.5"><Eye size={13} /> {(prompt.views || 0).toLocaleString()} views</span>
@@ -130,16 +130,16 @@ export default function PromptDetails() {
             </div>
 
             {prompt.tags && prompt.tags.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-1.5">
+              <div className="mt-3 sm:mt-4 flex flex-wrap gap-1 sm:gap-1.5">
                 {prompt.tags.map((t) => (
-                  <span key={t} className="chip">#{t}</span>
+                  <span key={t} className="chip !text-[10px] sm:!text-xs !py-0.5">#{t}</span>
                 ))}
               </div>
             )}
           </motion.div>
 
           {promptImage && (
-            <div className="mt-6 overflow-hidden rounded-xl2 border border-line aspect-[16/9]">
+            <div className="mt-5 sm:mt-6 overflow-hidden rounded-xl2 border border-line aspect-[16/9] w-full">
               <img
                 src={promptImage}
                 alt={prompt.title}
@@ -151,18 +151,18 @@ export default function PromptDetails() {
             </div>
           )}
 
-          <div className="mt-6 prose prose-invert max-w-none prose-p:text-ink-muted prose-headings:font-display">
+          <div className="mt-5 sm:mt-6 prose prose-invert max-w-none text-xs sm:text-sm prose-p:text-ink-muted prose-headings:font-display">
             <ReactMarkdown>{prompt.description}</ReactMarkdown>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-6 sm:mt-8">
             <VariableForm variables={variables} onGenerate={handleGenerate} />
           </div>
 
           <div className="mt-6">
-            <h3 className="mb-3 font-display font-semibold text-ink">Generated prompt</h3>
-            <div className="glass-card p-5">
-              <div className="font-mono text-sm leading-relaxed whitespace-pre-wrap text-ink/90">
+            <h3 className="mb-3 font-display font-semibold text-ink text-base sm:text-lg">Generated prompt</h3>
+            <div className="glass-card p-4 sm:p-5">
+              <div className="font-mono text-xs sm:text-sm leading-relaxed whitespace-pre-wrap text-ink/90 break-words overflow-x-hidden">
                 {tokens.map((tok, i) =>
                   tok.type === 'text' ? (
                     <span key={i}>{tok.value}</span>
@@ -173,12 +173,12 @@ export default function PromptDetails() {
                   )
                 )}
               </div>
-              <div className="mt-5 flex flex-col sm:flex-row gap-3">
+              <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
                 <CopyButton text={finalPrompt} onCopied={handleCopied} />
                 <button onClick={handleShare} className="btn-ghost justify-center">
                   <Share2 size={16} /> Share
                 </button>
-                <span className="ml-auto self-center text-xs text-ink-faint font-mono">
+                <span className="text-center sm:text-left sm:ml-auto text-[11px] sm:text-xs text-ink-faint font-mono mt-1 sm:mt-0">
                   ~{estimateTokens(finalPrompt)} tokens
                 </span>
               </div>
@@ -186,9 +186,9 @@ export default function PromptDetails() {
           </div>
 
           {(prompt.outputImage || prompt.output_image) && (
-            <div className="mt-8">
-              <h3 className="mb-3 font-display font-semibold text-ink">Example output</h3>
-              <div className="overflow-hidden rounded-xl2 border border-line aspect-video">
+            <div className="mt-6 sm:mt-8">
+              <h3 className="mb-3 font-display font-semibold text-ink text-base sm:text-lg">Example output</h3>
+              <div className="overflow-hidden rounded-xl2 border border-line aspect-video w-full">
                 <img
                   src={prompt.outputImage || prompt.output_image}
                   alt="Example output"
@@ -202,9 +202,9 @@ export default function PromptDetails() {
 
         {/* Sidebar */}
         <aside className="space-y-6">
-          <div className="glass-card p-5">
-            <h4 className="font-display font-semibold text-ink mb-3">At a glance</h4>
-            <dl className="space-y-2.5 text-sm">
+          <div className="glass-card p-4 sm:p-5">
+            <h4 className="font-display font-semibold text-ink mb-3 text-sm sm:text-base">At a glance</h4>
+            <dl className="space-y-2.5 text-xs sm:text-sm">
               <div className="flex justify-between">
                 <dt className="text-ink-faint">Category</dt>
                 <dd className="text-ink-muted">{category?.name ?? '—'}</dd>
@@ -226,8 +226,8 @@ export default function PromptDetails() {
 
           {related && related.length > 0 && (
             <div>
-              <h4 className="font-display font-semibold text-ink mb-3">Related prompts</h4>
-              <div className="space-y-4">
+              <h4 className="font-display font-semibold text-ink mb-3 text-sm sm:text-base">Related prompts</h4>
+              <div className="grid gap-3.5 sm:gap-4 sm:grid-cols-2 lg:grid-cols-1">
                 {related.map((p, i) => (
                   <PromptCard key={p.id} prompt={p} index={i} />
                 ))}
@@ -240,9 +240,11 @@ export default function PromptDetails() {
       <motion.div
         initial={false}
         animate={{ opacity: toast ? 1 : 0, y: toast ? 0 : 16 }}
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+        className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none max-w-[90vw]"
       >
-        <div className="glass-card px-4 py-2.5 text-sm text-ink shadow-glow">Copied successfully</div>
+        <div className="glass-card px-4 py-2 text-xs sm:text-sm text-ink shadow-glow text-center">
+          Copied successfully
+        </div>
       </motion.div>
     </section>
   )
