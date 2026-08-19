@@ -51,7 +51,24 @@ export default function Footer() {
       <div className="border-t border-line py-6 text-center space-y-1 text-xs text-ink-faint">
         <p>© {new Date().getFullYear()} PromptVault. All rights reserved.</p>
         <p>
-          Developed by <span className="text-ink-muted font-medium">Amna Shakeel</span> · A project of <span className="text-ink-muted font-medium">WeConnect Innovations</span>
+          Developed by{' '}
+          <a
+            href="https://www.linkedin.com/in/amna-shakeel21"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink-muted font-medium hover:text-violet-soft transition-colors"
+          >
+            Amna Shakeel
+          </a>
+          {' · '}A project of{' '}
+          <a
+            href="https://www.linkedin.com/in/abdullahwale"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink-muted font-medium hover:text-violet-soft transition-colors"
+          >
+            WeConnect Innovations
+          </a>
         </p>
       </div>
     </footer>
