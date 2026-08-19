@@ -1,0 +1,11 @@
+import{c as l,j as e,m as h,L as m,r as o}from"./index-B4FMJIKb.js";import{C as f,a as g,F as x,T as y,b as v,S as d,P as b,B as k,c as C,d as j,M}from"./terminal-Bv1cStt4.js";import{S as w}from"./share-2-CNr3w4H1.js";import{g as L}from"./promptService-CLuw5qV-.js";/**
+ * @license lucide-react v0.424.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const S=l("BookOpen",[["path",{d:"M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z",key:"vv98re"}],["path",{d:"M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z",key:"1cyq3y"}]]);/**
+ * @license lucide-react v0.424.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const N=l("Lightbulb",[["path",{d:"M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5",key:"1gvzjb"}],["path",{d:"M9 18h6",key:"x1upvd"}],["path",{d:"M10 22h4",key:"ceow96"}]]),z={Megaphone:M,PenLine:j,Code2:C,Briefcase:k,Share2:w,Palette:b,Sparkles:d,FolderKanban:v,Terminal:y,FileText:x,Cpu:g,Compass:f,Lightbulb:N,BookOpen:S};function P({category:t,index:r=0}){const n=z[t.icon]||d;return e.jsx(h.div,{initial:{opacity:0,y:16},whileInView:{opacity:1,y:0},viewport:{once:!0,margin:"-40px"},transition:{duration:.4,delay:Math.min(r*.06,.3)},children:e.jsxs(m,{to:`/category/${t.slug}`,className:"glass-card group flex items-center gap-4 p-5 transition-all hover:-translate-y-1 hover:shadow-glow",children:[e.jsx("span",{className:"grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet/20 to-cyan/10 border border-line text-violet-soft transition-colors group-hover:text-cyan",children:e.jsx(n,{size:20})}),e.jsxs("div",{children:[e.jsx("h3",{className:"font-display font-semibold text-ink",children:t.name}),e.jsxs("p",{className:"text-xs text-ink-faint",children:[t.count??0," prompts"]})]})]})})}function O(){const[t,r]=o.useState([]),[n,i]=o.useState(!0),[p,c]=o.useState(null);return o.useEffect(()=>{let a=!0;async function u(){try{i(!0);const s=await L();a&&(r(s),c(null))}catch(s){a&&(console.error("Failed to load categories:",s),c(s))}finally{a&&i(!1)}}return u(),()=>{a=!1}},[]),{categories:t,loading:n,error:p}}export{P as C,O as u};
