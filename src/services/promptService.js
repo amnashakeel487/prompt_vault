@@ -1,10 +1,37 @@
 import { supabase } from './supabaseClient'
+import { formatGoogleDriveImageUrl, detectImageSource } from '../utils/googleDrive'
 
 /**
  * Normalizes a prompt record from Supabase (snake_case) to match frontend properties (camelCase + snake_case).
  */
 export function formatPrompt(raw) {
   if (!raw) return null
+
+  // Process images array if present
+  const rawImages = Array.isArray(raw.prompt_images)
+    ? raw.prompt_images
+    : Array.isArray(raw.images)
+    ? raw.images
+    : []
+
+  const formattedImages = rawImages
+    .map((img) => ({
+      id: img.id,
+      promptId: img.prompt_id || img.promptId,
+      imageUrl: formatGoogleDriveImageUrl(img.image_url || img.imageUrl),
+      source: img.source || detectImageSource(img.image_url || img.imageUrl),
+      sortOrder: Number(img.sort_order || img.sortOrder || 0),
+      isFeatured: Boolean(img.is_featured || img.isFeatured),
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+
+  // Primary featured image
+  const featuredFromList = formattedImages.find((img) => img.isFeatured)?.imageUrl
+  const primaryFeaturedImage =
+    featuredFromList ||
+    formatGoogleDriveImageUrl(raw.featured_image || raw.featuredImage) ||
+    (formattedImages.length > 0 ? formattedImages[0].imageUrl : '')
+
   return {
     ...raw,
     id: raw.id,
@@ -15,10 +42,12 @@ export function formatPrompt(raw) {
     category_id: raw.category_id,
     subcategoryId: raw.subcategory_id,
     subcategory_id: raw.subcategory_id,
-    featuredImage: raw.featured_image || '',
-    featured_image: raw.featured_image || '',
-    outputImage: raw.output_image || '',
-    output_image: raw.output_image || '',
+    featuredImage: primaryFeaturedImage,
+    featured_image: primaryFeaturedImage,
+    outputImage: formatGoogleDriveImageUrl(raw.output_image || raw.outputImage || ''),
+    output_image: formatGoogleDriveImageUrl(raw.output_image || raw.outputImage || ''),
+    images: formattedImages,
+    prompt_images: formattedImages,
     prompt: raw.prompt || '',
     variables: Array.isArray(raw.variables) ? raw.variables : [],
     tags: Array.isArray(raw.tags) ? raw.tags : [],
@@ -28,7 +57,9 @@ export function formatPrompt(raw) {
     featured: Boolean(raw.featured),
     popular: Boolean(raw.popular),
     trending: Boolean(raw.trending),
-    status: raw.status || 'published',
+    status: raw.status || 'published', // 'published' | 'draft' | 'pending' | 'rejected'
+    rejectionReason: raw.rejection_reason || '',
+    rejection_reason: raw.rejection_reason || '',
     seoTitle: raw.seo_title || raw.title || '',
     seo_title: raw.seo_title || raw.title || '',
     seoDescription: raw.seo_description || raw.description || '',
@@ -77,7 +108,26 @@ export function formatSubcategory(raw) {
 }
 
 /**
- * Fetch all categories with prompt counts.
+ * Normalizes an admin profile record.
+ */
+export function formatAdminProfile(raw) {
+  if (!raw) return null
+  return {
+    id: raw.id,
+    role: raw.role || 'category_admin',
+    assignedCategoryId: raw.assigned_category_id,
+    assigned_category_id: raw.assigned_category_id,
+    displayName: raw.display_name || '',
+    display_name: raw.display_name || '',
+    createdAt: raw.created_at,
+    created_at: raw.created_at,
+    category: raw.categories ? formatCategory(raw.categories) : undefined,
+    email: raw.email || raw.user?.email || '',
+  }
+}
+
+/**
+ * Fetch all categories with published prompt counts.
  */
 export async function getCategories() {
   const { data: categoriesData, error: catError } = await supabase
@@ -233,12 +283,12 @@ export async function deleteSubcategory(id) {
 }
 
 /**
- * Fetch prompts with flexible filtering, sorting, and pagination.
+ * Public: Fetch published prompts with flexible filtering, sorting, and pagination.
  */
 export async function getPrompts({
   categoryId,
   subcategoryId,
-  sort = 'created_at', // 'created_at' | 'views' | 'copies'
+  sort = 'created_at',
   order = 'desc',
   status = 'published',
   featured,
@@ -248,8 +298,9 @@ export async function getPrompts({
   page = 1,
   limit = 12,
 } = {}) {
-  let query = supabase.from('prompts').select('*', { count: 'exact' })
+  let query = supabase.from('prompts').select('*, prompt_images(*)', { count: 'exact' })
 
+  // Public site only shows published
   if (status) {
     query = query.eq('status', status)
   }
@@ -300,12 +351,12 @@ export async function getPrompts({
 }
 
 /**
- * Fetch a prompt by slug.
+ * Fetch a single prompt by slug (includes multi-images, categories, subcategories).
  */
 export async function getPromptBySlug(slug) {
   const { data, error } = await supabase
     .from('prompts')
-    .select('*, categories(*), subcategories(*)')
+    .select('*, categories(*), subcategories(*), prompt_images(*)')
     .eq('slug', slug)
     .single()
 
@@ -348,13 +399,20 @@ export async function incrementPromptCopies(promptId) {
 }
 
 /**
- * Admin: Get all prompts (all statuses) with limit.
+ * Admin: Get all prompts (scoped by category if category_admin).
  */
-export async function getAdminPrompts() {
-  const { data, error } = await supabase
+export async function getAdminPrompts(userProfile = null) {
+  let query = supabase
     .from('prompts')
-    .select('*, categories(name), subcategories(name)')
+    .select('*, categories(name), subcategories(name), prompt_images(*)')
     .order('created_at', { ascending: false })
+
+  // Scope to category if user is a category admin
+  if (userProfile && userProfile.role === 'category_admin' && userProfile.assigned_category_id) {
+    query = query.eq('category_id', userProfile.assigned_category_id)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('Error fetching admin prompts:', error)
@@ -365,12 +423,80 @@ export async function getAdminPrompts() {
 }
 
 /**
- * Admin: Fetch overview stats.
+ * Super Admin: Get all pending prompts awaiting review.
  */
-export async function getAdminStats() {
-  const { data: promptData, error: promptError } = await supabase
+export async function getPendingPrompts() {
+  const { data, error } = await supabase
     .from('prompts')
-    .select('views, copies')
+    .select('*, categories(name), subcategories(name), prompt_images(*)')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching pending prompts:', error)
+    throw error
+  }
+
+  return (data || []).map(formatPrompt)
+}
+
+/**
+ * Super Admin: Approve a pending prompt (sets status to 'published').
+ */
+export async function approvePrompt(id) {
+  const { data, error } = await supabase
+    .from('prompts')
+    .update({
+      status: 'published',
+      rejection_reason: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error approving prompt:', error)
+    throw error
+  }
+
+  return formatPrompt(data)
+}
+
+/**
+ * Super Admin: Reject a pending prompt with optional reason.
+ */
+export async function rejectPrompt(id, reason = '') {
+  const { data, error } = await supabase
+    .from('prompts')
+    .update({
+      status: 'rejected',
+      rejection_reason: reason.trim(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error rejecting prompt:', error)
+    throw error
+  }
+
+  return formatPrompt(data)
+}
+
+/**
+ * Admin: Fetch overview stats (scoped if category_admin).
+ */
+export async function getAdminStats(userProfile = null) {
+  let promptQuery = supabase.from('prompts').select('views, copies, status, category_id')
+
+  if (userProfile && userProfile.role === 'category_admin' && userProfile.assigned_category_id) {
+    promptQuery = promptQuery.eq('category_id', userProfile.assigned_category_id)
+  }
+
+  const { data: promptData, error: promptError } = await promptQuery
 
   const { count: catCount, error: catError } = await supabase
     .from('categories')
@@ -383,41 +509,64 @@ export async function getAdminStats() {
       totalCategories: 0,
       totalViews: 0,
       totalCopies: 0,
+      pendingCount: 0,
     }
   }
 
   const totalPrompts = promptData ? promptData.length : 0
   const totalViews = (promptData || []).reduce((acc, p) => acc + (p.views || 0), 0)
   const totalCopies = (promptData || []).reduce((acc, p) => acc + (p.copies || 0), 0)
+  const pendingCount = (promptData || []).filter((p) => p.status === 'pending').length
 
   return {
     totalPrompts,
     totalCategories: catCount || 0,
     totalViews,
     totalCopies,
+    pendingCount,
   }
 }
 
 /**
- * Admin: Create a new prompt.
+ * Admin: Create a prompt with multi-image support and role-scoped status enforcement.
  */
-export async function createPrompt(payload) {
+export async function createPrompt(payload, userProfile = null) {
+  // Enforce pending status if category admin
+  const isCatAdmin = userProfile && userProfile.role === 'category_admin'
+  let targetStatus = payload.status || 'published'
+  let targetCategory = payload.categoryId || payload.category_id || null
+
+  if (isCatAdmin) {
+    targetStatus = 'pending'
+    targetCategory = userProfile.assigned_category_id || targetCategory
+  }
+
+  // Determine primary featured image
+  const images = Array.isArray(payload.images) ? payload.images : []
+  const featuredFromImages = images.find((img) => img.isFeatured)?.imageUrl || images[0]?.imageUrl
+  const primaryFeaturedImage =
+    payload.featuredImage ||
+    payload.featured_image ||
+    featuredFromImages ||
+    ''
+
   const row = {
     title: payload.title,
     slug: payload.slug,
     description: payload.description,
-    category_id: payload.categoryId || payload.category_id || null,
+    category_id: targetCategory,
     subcategory_id: payload.subcategoryId || payload.subcategory_id || null,
-    featured_image: payload.featuredImage || payload.featured_image || '',
-    output_image: payload.outputImage || payload.output_image || '',
+    featured_image: formatGoogleDriveImageUrl(primaryFeaturedImage),
+    output_image: formatGoogleDriveImageUrl(payload.outputImage || payload.output_image || ''),
     prompt: payload.prompt,
     variables: payload.variables || [],
     tags: payload.tags || [],
-    author: payload.author || 'Admin',
+    author: payload.author || userProfile?.display_name || 'Admin',
     featured: Boolean(payload.featured),
     popular: Boolean(payload.popular),
     trending: Boolean(payload.trending),
-    status: payload.status || 'published',
+    status: targetStatus,
+    rejection_reason: null,
     seo_title: payload.seoTitle || payload.seo_title || payload.title,
     seo_description: payload.seoDescription || payload.seo_description || payload.description,
     updated_at: new Date().toISOString(),
@@ -434,13 +583,34 @@ export async function createPrompt(payload) {
     throw error
   }
 
+  // Save multiple images to prompt_images table
+  if (images.length > 0 && data.id) {
+    await savePromptImages(data.id, images)
+  }
+
   return formatPrompt(data)
 }
 
 /**
- * Admin: Update an existing prompt.
+ * Admin: Update an existing prompt (resets status to 'pending' if category_admin).
  */
-export async function updatePrompt(id, payload) {
+export async function updatePrompt(id, payload, userProfile = null) {
+  const isCatAdmin = userProfile && userProfile.role === 'category_admin'
+  let targetStatus = payload.status
+
+  if (isCatAdmin) {
+    // Category admin updates must force status back to 'pending' for review
+    targetStatus = 'pending'
+  }
+
+  const images = Array.isArray(payload.images) ? payload.images : null
+  let primaryFeaturedImage = payload.featuredImage ?? payload.featured_image
+
+  if (images && images.length > 0) {
+    const feat = images.find((img) => img.isFeatured)?.imageUrl || images[0]?.imageUrl
+    if (feat) primaryFeaturedImage = feat
+  }
+
   const row = {
     ...(payload.title !== undefined && { title: payload.title }),
     ...(payload.slug !== undefined && { slug: payload.slug }),
@@ -449,17 +619,22 @@ export async function updatePrompt(id, payload) {
     ...(payload.category_id !== undefined && { category_id: payload.category_id || null }),
     ...(payload.subcategoryId !== undefined && { subcategory_id: payload.subcategoryId || null }),
     ...(payload.subcategory_id !== undefined && { subcategory_id: payload.subcategory_id || null }),
-    ...(payload.featuredImage !== undefined && { featured_image: payload.featuredImage }),
-    ...(payload.featured_image !== undefined && { featured_image: payload.featured_image }),
-    ...(payload.outputImage !== undefined && { output_image: payload.outputImage }),
-    ...(payload.output_image !== undefined && { output_image: payload.output_image }),
+    ...(primaryFeaturedImage !== undefined && {
+      featured_image: formatGoogleDriveImageUrl(primaryFeaturedImage),
+    }),
+    ...(payload.outputImage !== undefined && {
+      output_image: formatGoogleDriveImageUrl(payload.outputImage),
+    }),
+    ...(payload.output_image !== undefined && {
+      output_image: formatGoogleDriveImageUrl(payload.output_image),
+    }),
     ...(payload.prompt !== undefined && { prompt: payload.prompt }),
     ...(payload.variables !== undefined && { variables: payload.variables }),
     ...(payload.tags !== undefined && { tags: payload.tags }),
     ...(payload.featured !== undefined && { featured: Boolean(payload.featured) }),
     ...(payload.popular !== undefined && { popular: Boolean(payload.popular) }),
     ...(payload.trending !== undefined && { trending: Boolean(payload.trending) }),
-    ...(payload.status !== undefined && { status: payload.status }),
+    ...(targetStatus !== undefined && { status: targetStatus }),
     ...(payload.seoTitle !== undefined && { seo_title: payload.seoTitle }),
     ...(payload.seo_title !== undefined && { seo_title: payload.seo_title }),
     ...(payload.seoDescription !== undefined && { seo_description: payload.seoDescription }),
@@ -479,6 +654,11 @@ export async function updatePrompt(id, payload) {
     throw error
   }
 
+  // Update prompt images if provided
+  if (images !== null) {
+    await savePromptImages(id, images)
+  }
+
   return formatPrompt(data)
 }
 
@@ -495,11 +675,173 @@ export async function deletePrompt(id) {
 }
 
 /**
- * Admin: Toggle prompt publish status.
+ * Admin: Toggle prompt publish status (Super Admin only).
  */
 export async function togglePromptStatus(id, currentStatus) {
   const newStatus = currentStatus === 'published' ? 'draft' : 'published'
   return updatePrompt(id, { status: newStatus })
+}
+
+/**
+ * Fetch all images for a specific prompt.
+ */
+export async function getPromptImages(promptId) {
+  if (!promptId) return []
+  const { data, error } = await supabase
+    .from('prompt_images')
+    .select('*')
+    .eq('prompt_id', promptId)
+    .order('sort_order', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching prompt images:', error)
+    return []
+  }
+
+  return (data || []).map((img) => ({
+    id: img.id,
+    promptId: img.prompt_id,
+    imageUrl: formatGoogleDriveImageUrl(img.image_url),
+    source: img.source || detectImageSource(img.image_url),
+    sortOrder: img.sort_order,
+    isFeatured: img.is_featured,
+  }))
+}
+
+/**
+ * Save / sync multiple images for a prompt.
+ */
+export async function savePromptImages(promptId, images = []) {
+  if (!promptId) return []
+
+  try {
+    // 1. Delete existing images for prompt
+    await supabase.from('prompt_images').delete().eq('prompt_id', promptId)
+
+    if (images.length === 0) return []
+
+    // 2. Insert new batch
+    const rows = images.map((img, index) => ({
+      prompt_id: promptId,
+      image_url: formatGoogleDriveImageUrl(img.imageUrl || img.image_url),
+      source: img.source || detectImageSource(img.imageUrl || img.image_url),
+      sort_order: img.sortOrder !== undefined ? img.sortOrder : index,
+      is_featured: Boolean(img.isFeatured || img.is_featured || index === 0),
+    }))
+
+    const { data, error } = await supabase.from('prompt_images').insert(rows).select()
+    if (error) throw error
+    return data || []
+  } catch (err) {
+    console.error('Error saving prompt images:', err)
+    return []
+  }
+}
+
+/**
+ * Super Admin: Get all admin profiles.
+ */
+export async function getAdminProfiles() {
+  const { data, error } = await supabase
+    .from('admin_profiles')
+    .select('*, categories(id, name, slug)')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching admin profiles:', error)
+    throw error
+  }
+
+  return (data || []).map(formatAdminProfile)
+}
+
+/**
+ * Super Admin: Create a new admin user + profile.
+ */
+export async function createAdminUser({ email, password, displayName, role = 'category_admin', assignedCategoryId = null }) {
+  // 1. Sign up user in Supabase Auth
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email: email.trim(),
+    password: password.trim(),
+    options: {
+      data: {
+        display_name: displayName.trim(),
+      },
+    },
+  })
+
+  if (authError) {
+    console.error('Error creating auth user:', authError)
+    throw authError
+  }
+
+  const newUserId = authData.user?.id
+  if (!newUserId) {
+    throw new Error('User creation returned no ID.')
+  }
+
+  // 2. Insert into admin_profiles
+  const profileRow = {
+    id: newUserId,
+    role: role || 'category_admin',
+    assigned_category_id: role === 'super_admin' ? null : assignedCategoryId || null,
+    display_name: displayName.trim() || email.split('@')[0],
+  }
+
+  const { data: profileData, error: profileError } = await supabase
+    .from('admin_profiles')
+    .insert([profileRow])
+    .select('*, categories(id, name, slug)')
+    .single()
+
+  if (profileError) {
+    console.error('Error creating admin profile record:', profileError)
+    throw profileError
+  }
+
+  return formatAdminProfile({
+    ...profileData,
+    email: email.trim(),
+  })
+}
+
+/**
+ * Super Admin: Update an admin profile's role or assigned category.
+ */
+export async function updateAdminProfile(id, { role, assignedCategoryId, displayName }) {
+  const row = {
+    ...(role !== undefined && {
+      role,
+      assigned_category_id: role === 'super_admin' ? null : assignedCategoryId || null,
+    }),
+    ...(displayName !== undefined && { display_name: displayName.trim() }),
+  }
+
+  const { data, error } = await supabase
+    .from('admin_profiles')
+    .update(row)
+    .eq('id', id)
+    .select('*, categories(id, name, slug)')
+    .single()
+
+  if (error) {
+    console.error('Error updating admin profile:', error)
+    throw error
+  }
+
+  return formatAdminProfile(data)
+}
+
+/**
+ * Super Admin: Delete an admin profile / revoke admin privileges.
+ */
+export async function deleteAdminProfile(id) {
+  const { error } = await supabase.from('admin_profiles').delete().eq('id', id)
+  if (error) {
+    console.error('Error deleting admin profile:', error)
+    throw error
+  }
+  return true
 }
 
 /**
@@ -573,4 +915,3 @@ export async function deleteContactMessage(id) {
   }
   return true
 }
-

@@ -9,7 +9,12 @@ export default function PromptCard({ prompt, index = 0 }) {
     ? prompt.variables.length
     : extractVariables(promptText).length
 
+  const featuredFromList = Array.isArray(prompt?.images)
+    ? prompt.images.find((img) => img.isFeatured)?.imageUrl || prompt.images[0]?.imageUrl
+    : null
+
   const imageUrl =
+    featuredFromList ||
     prompt?.featuredImage ||
     prompt?.featured_image ||
     'https://images.unsplash.com/photo-1533750349088-cd871a92f312?q=80&w=1200&auto=format&fit=crop'

@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
-import { ChevronRight, Eye, Copy, Calendar, Share2, Clock, User, Loader2 } from 'lucide-react'
+import { ChevronRight, Eye, Copy, Calendar, Share2, Clock, User, Loader2, ImageIcon, Sparkles } from 'lucide-react'
 import SEO from '../components/SEO'
 import CopyButton from '../components/CopyButton'
 import VariableForm from '../components/VariableForm'
@@ -24,6 +24,7 @@ export default function PromptDetails() {
   const [values, setValues] = useState({})
   const [localCopyCount, setLocalCopyCount] = useState(null)
   const [toast, setToast] = useState(false)
+  const [activeImageIndex, setActiveImageIndex] = useState(0)
 
   const copyCount = localCopyCount !== null ? localCopyCount : prompt?.copies ?? 0
 
@@ -39,6 +40,37 @@ export default function PromptDetails() {
     [prompt, values]
   )
   const tokens = useMemo(() => tokenizePrompt(finalPrompt), [finalPrompt])
+
+  // Extract all available images (from multi-image table or fallback single fields)
+  const allImages = useMemo(() => {
+    if (!prompt) return []
+    const list = []
+
+    if (Array.isArray(prompt.images) && prompt.images.length > 0) {
+      prompt.images.forEach((img) => {
+        if (img.imageUrl && !list.includes(img.imageUrl)) {
+          list.push(img.imageUrl)
+        }
+      })
+    }
+
+    if (prompt.featuredImage && !list.includes(prompt.featuredImage)) {
+      list.unshift(prompt.featuredImage)
+    }
+
+    if (prompt.outputImage && !list.includes(prompt.outputImage)) {
+      list.push(prompt.outputImage)
+    }
+
+    return list.length > 0
+      ? list
+      : ['https://images.unsplash.com/photo-1533750349088-cd871a92f312?q=80&w=1200&auto=format&fit=crop']
+  }, [prompt])
+
+  // Reset active image on prompt change
+  useEffect(() => {
+    setActiveImageIndex(0)
+  }, [slug])
 
   if (loading) {
     return (
@@ -61,10 +93,7 @@ export default function PromptDetails() {
 
   const category = prompt.category || (prompt.categories ? prompt.categories : null)
   const formattedDate = prompt.updatedAt || prompt.createdAt || 'Recently'
-  const promptImage =
-    prompt.featuredImage ||
-    prompt.featured_image ||
-    'https://images.unsplash.com/photo-1533750349088-cd871a92f312?q=80&w=1200&auto=format&fit=crop'
+  const currentMainImage = allImages[activeImageIndex] || allImages[0]
 
   function handleGenerate(formValues) {
     setValues(formValues)
@@ -93,7 +122,7 @@ export default function PromptDetails() {
         title={prompt.seoTitle || prompt.title}
         description={prompt.seoDescription || prompt.description}
         canonical={typeof window !== 'undefined' ? window.location.href : undefined}
-        image={promptImage}
+        image={currentMainImage}
         type="article"
         publishedTime={prompt.created_at || prompt.createdAt}
         modifiedTime={prompt.updated_at || prompt.updatedAt}
@@ -101,11 +130,11 @@ export default function PromptDetails() {
       />
 
       <nav className="mb-4 sm:mb-6 flex flex-wrap items-center gap-1.5 text-[11px] sm:text-xs text-ink-faint">
-        <Link to="/" className="hover:text-ink-muted">Home</Link>
+        <Link to="/" className="hover:text-white transition-colors">Home</Link>
         <ChevronRight size={12} />
         {category && (
           <>
-            <Link to={`/category/${category.slug}`} className="hover:text-ink-muted">
+            <Link to={`/category/${category.slug}`} className="hover:text-white transition-colors">
               {category.name}
             </Link>
             <ChevronRight size={12} />
@@ -117,7 +146,29 @@ export default function PromptDetails() {
       <div className="grid gap-8 lg:gap-10 lg:grid-cols-[1fr_340px]">
         <div>
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-semibold text-ink leading-tight break-words">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              {prompt.status !== 'published' && (
+                <span className={`chip text-[10px] font-semibold uppercase ${
+                  prompt.status === 'pending'
+                    ? '!border-amber/40 !bg-amber/15 !text-amber'
+                    : prompt.status === 'rejected'
+                    ? '!border-red-500/40 !bg-red-500/15 !text-red-400'
+                    : '!border-line !bg-white/[0.05] !text-ink-muted'
+                }`}>
+                  {prompt.status === 'pending' ? 'Pending Review' : prompt.status}
+                </span>
+              )}
+              {prompt.featured && (
+                <span className="chip !border-violet/30 !bg-violet/10 !text-violet-soft text-[10px] flex items-center gap-1">
+                  <Sparkles size={11} /> Featured
+                </span>
+              )}
+            </div>
+
+            <h1
+              style={{ color: '#FFFFFF' }}
+              className="font-display text-2xl sm:text-3xl md:text-4xl font-semibold text-white leading-tight break-words"
+            >
               {prompt.title}
             </h1>
 
@@ -138,16 +189,47 @@ export default function PromptDetails() {
             )}
           </motion.div>
 
-          {promptImage && (
-            <div className="mt-5 sm:mt-6 overflow-hidden rounded-xl2 border border-line aspect-[16/9] w-full">
-              <img
-                src={promptImage}
-                alt={prompt.title}
-                loading="lazy"
-                width={800}
-                height={450}
-                className="w-full h-full object-cover"
-              />
+          {/* Multi-Image Hero Gallery */}
+          {currentMainImage && (
+            <div className="mt-5 sm:mt-6 space-y-3">
+              <div className="overflow-hidden rounded-xl2 border border-line aspect-[16/9] w-full bg-surface-2 shadow-card relative">
+                <img
+                  src={currentMainImage}
+                  alt={prompt.title}
+                  loading="lazy"
+                  width={800}
+                  height={450}
+                  className="w-full h-full object-cover transition-all duration-300"
+                />
+              </div>
+
+              {/* Multi-Image Thumbnails Bar */}
+              {allImages.length > 1 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  {allImages.map((imgUrl, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveImageIndex(idx)}
+                      className={`relative h-16 w-24 shrink-0 rounded-lg overflow-hidden border transition-all cursor-pointer ${
+                        activeImageIndex === idx
+                          ? 'border-violet shadow-glow scale-[1.03]'
+                          : 'border-line/60 opacity-60 hover:opacity-100 hover:border-white/40'
+                      }`}
+                    >
+                      <img
+                        src={imgUrl}
+                        alt={`Thumbnail ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      {idx === 0 && (
+                        <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.2 text-[8px] text-white">
+                          Cover
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -160,7 +242,9 @@ export default function PromptDetails() {
           </div>
 
           <div className="mt-6">
-            <h3 className="mb-3 font-display font-semibold text-ink text-base sm:text-lg">Generated prompt</h3>
+            <h3 style={{ color: '#FFFFFF' }} className="mb-3 font-display font-semibold text-white text-base sm:text-lg">
+              Generated prompt
+            </h3>
             <div className="glass-card p-4 sm:p-5">
               <div className="font-mono text-xs sm:text-sm leading-relaxed whitespace-pre-wrap text-ink/90 break-words overflow-x-hidden">
                 {tokens.map((tok, i) =>
@@ -184,26 +268,14 @@ export default function PromptDetails() {
               </div>
             </div>
           </div>
-
-          {(prompt.outputImage || prompt.output_image) && (
-            <div className="mt-6 sm:mt-8">
-              <h3 className="mb-3 font-display font-semibold text-ink text-base sm:text-lg">Example output</h3>
-              <div className="overflow-hidden rounded-xl2 border border-line aspect-video w-full">
-                <img
-                  src={prompt.outputImage || prompt.output_image}
-                  alt="Example output"
-                  loading="lazy"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Sidebar */}
         <aside className="space-y-6">
           <div className="glass-card p-4 sm:p-5">
-            <h4 className="font-display font-semibold text-ink mb-3 text-sm sm:text-base">At a glance</h4>
+            <h4 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-white mb-3 text-sm sm:text-base">
+              At a glance
+            </h4>
             <dl className="space-y-2.5 text-xs sm:text-sm">
               <div className="flex justify-between">
                 <dt className="text-ink-faint">Category</dt>
@@ -221,12 +293,20 @@ export default function PromptDetails() {
                 <dt className="text-ink-faint">Status</dt>
                 <dd className="capitalize text-ink-muted">{prompt.status}</dd>
               </div>
+              {prompt.images && prompt.images.length > 0 && (
+                <div className="flex justify-between">
+                  <dt className="text-ink-faint">Gallery</dt>
+                  <dd className="text-cyan font-mono">{prompt.images.length} images</dd>
+                </div>
+              )}
             </dl>
           </div>
 
           {related && related.length > 0 && (
             <div>
-              <h4 className="font-display font-semibold text-ink mb-3 text-sm sm:text-base">Related prompts</h4>
+              <h4 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-white mb-3 text-sm sm:text-base">
+                Related prompts
+              </h4>
               <div className="grid gap-3.5 sm:gap-4 sm:grid-cols-2 lg:grid-cols-1">
                 {related.map((p, i) => (
                   <PromptCard key={p.id} prompt={p} index={i} />

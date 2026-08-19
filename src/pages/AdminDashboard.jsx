@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   FileText,
@@ -46,6 +46,16 @@ import {
   MessageSquare,
   Clock,
   Send,
+  Users,
+  Shield,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Link2,
+  Image as ImageIcon,
+  Star,
+  Upload,
+  CheckSquare,
 } from 'lucide-react'
 import SEO from '../components/SEO'
 import { useAuth } from '../hooks/useAuth'
@@ -67,8 +77,17 @@ import {
   getContactMessages,
   markContactMessageAsRead,
   deleteContactMessage,
+  getPendingPrompts,
+  approvePrompt,
+  rejectPrompt,
+  getAdminProfiles,
+  createAdminUser,
+  updateAdminProfile,
+  deleteAdminProfile,
+  getPromptImages,
 } from '../services/promptService'
 import { uploadImageToGitHub } from '../services/githubUpload'
+import { formatGoogleDriveImageUrl, extractGoogleDriveId, detectImageSource } from '../utils/googleDrive'
 import { extractVariables } from '../utils/variableParser'
 
 const AVAILABLE_ICONS = [
@@ -87,20 +106,32 @@ const AVAILABLE_ICONS = [
 ]
 
 export default function AdminDashboard() {
-  const { user, signOut } = useAuth()
-  const [activeTab, setActiveTab] = useState('prompts') // 'prompts' | 'categories' | 'messages' | 'analytics' | 'profile'
+  const {
+    user,
+    profile,
+    role,
+    isSuperAdmin,
+    isCategoryAdmin,
+    assignedCategoryId,
+    signOut,
+  } = useAuth()
+
+  const [activeTab, setActiveTab] = useState('prompts') // 'prompts' | 'pending' | 'categories' | 'admins' | 'messages' | 'analytics' | 'profile'
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  
+
   // Data States
   const [promptsList, setPromptsList] = useState([])
+  const [pendingList, setPendingList] = useState([])
   const [categoriesList, setCategoriesList] = useState([])
   const [subcategoriesList, setSubcategoriesList] = useState([])
   const [messagesList, setMessagesList] = useState([])
+  const [adminsList, setAdminsList] = useState([])
   const [stats, setStats] = useState({
     totalPrompts: 0,
     totalCategories: 0,
     totalViews: 0,
     totalCopies: 0,
+    pendingCount: 0,
   })
 
   const [loading, setLoading] = useState(true)
@@ -109,7 +140,7 @@ export default function AdminDashboard() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'published' | 'draft'
+  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'published' | 'pending' | 'rejected' | 'draft'
   const [categoryFilter, setCategoryFilter] = useState('all')
 
   // Prompt Form State
@@ -126,13 +157,40 @@ export default function AdminDashboard() {
     prompt: '',
     featuredImage: '',
     outputImage: '',
+    images: [],
     seoTitle: '',
     seoDescription: '',
     featured: false,
     popular: false,
     trending: false,
     status: 'published',
+    rejectionReason: '',
   })
+
+  // Multi-Image Form Tab & Inputs
+  const [imageSourceTab, setImageSourceTab] = useState('github') // 'github' | 'drive' | 'url'
+  const [driveUrlInput, setDriveUrlInput] = useState('')
+  const [directUrlInput, setDirectUrlInput] = useState('')
+
+  // Reject Modal State
+  const [rejectModal, setRejectModal] = useState({
+    show: false,
+    promptId: null,
+    promptTitle: '',
+    reason: '',
+  })
+  const [rejectingLoading, setRejectingLoading] = useState(false)
+
+  // Admin User Modal State
+  const [adminModal, setAdminModal] = useState({
+    show: false,
+    email: '',
+    password: '',
+    displayName: '',
+    role: 'category_admin',
+    assignedCategoryId: '',
+  })
+  const [submittingAdmin, setSubmittingAdmin] = useState(false)
 
   // Category Form State
   const [showCatModal, setShowCatModal] = useState(false)
@@ -149,8 +207,7 @@ export default function AdminDashboard() {
   const [subcatParentId, setSubcatParentId] = useState('')
 
   // Upload States
-  const [uploadingFeatured, setUploadingFeatured] = useState(false)
-  const [uploadingOutput, setUploadingOutput] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadError, setUploadError] = useState('')
 
   // Profile Form States
@@ -160,23 +217,44 @@ export default function AdminDashboard() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordUpdating, setPasswordUpdating] = useState(false)
 
+  // Assigned Category details (for category_admin)
+  const assignedCategory = useMemo(() => {
+    if (!assignedCategoryId || !categoriesList.length) return null
+    return categoriesList.find((c) => c.id === assignedCategoryId)
+  }, [assignedCategoryId, categoriesList])
+
   useEffect(() => {
     loadData()
-  }, [])
+  }, [profile])
 
   async function loadData() {
     try {
       setLoading(true)
-      const [prompts, cats, adminStats, messages] = await Promise.all([
-        getAdminPrompts(),
+      const userProfile = profile || { role, assigned_category_id: assignedCategoryId }
+
+      const promises = [
+        getAdminPrompts(userProfile),
         getCategories(),
-        getAdminStats(),
+        getAdminStats(userProfile),
         getContactMessages().catch(() => []),
-      ])
-      setPromptsList(prompts)
-      setCategoriesList(cats)
-      setStats(adminStats)
-      setMessagesList(messages)
+      ]
+
+      if (isSuperAdmin) {
+        promises.push(getPendingPrompts().catch(() => []))
+        promises.push(getAdminProfiles().catch(() => []))
+      }
+
+      const [prompts, cats, adminStats, messages, pending, admins] = await Promise.all(promises)
+
+      setPromptsList(prompts || [])
+      setCategoriesList(cats || [])
+      setStats(adminStats || { totalPrompts: 0, totalCategories: 0, totalViews: 0, totalCopies: 0, pendingCount: 0 })
+      setMessagesList(messages || [])
+
+      if (isSuperAdmin) {
+        setPendingList(pending || [])
+        setAdminsList(admins || [])
+      }
     } catch (err) {
       console.error('Error loading dashboard data:', err)
       notify('error', 'Failed to load dashboard data.')
@@ -189,7 +267,7 @@ export default function AdminDashboard() {
     setRefreshing(true)
     await loadData()
     setRefreshing(false)
-    notify('success', 'Dashboard data updated.')
+    notify('success', 'Dashboard data refreshed.')
   }
 
   function notify(type, text) {
@@ -214,363 +292,469 @@ export default function AdminDashboard() {
     fetchSubs()
   }, [promptForm.categoryId])
 
-  // --- PROMPT HANDLERS ---
+  // --- PROMPT MODAL HANDLERS ---
   function openNewPromptModal() {
     setEditingPromptId(null)
+    const initialCategory = isCategoryAdmin && assignedCategoryId
+      ? assignedCategoryId
+      : categoriesList[0]?.id || ''
+
     setPromptForm({
       title: '',
       slug: '',
-      categoryId: categoriesList[0]?.id || '',
+      categoryId: initialCategory,
       subcategoryId: '',
       tags: '',
       description: '',
       prompt: '',
       featuredImage: '',
       outputImage: '',
+      images: [],
       seoTitle: '',
       seoDescription: '',
       featured: false,
       popular: false,
       trending: false,
-      status: 'published',
+      status: isCategoryAdmin ? 'pending' : 'published',
+      rejectionReason: '',
     })
+    setDriveUrlInput('')
+    setDirectUrlInput('')
     setUploadError('')
     setShowPromptModal(true)
   }
 
-  function openEditPromptModal(p) {
+  async function openEditPromptModal(p) {
     setEditingPromptId(p.id)
+    let images = p.images || []
+    if (!images.length && p.id) {
+      try {
+        images = await getPromptImages(p.id)
+      } catch (e) {
+        console.warn('Could not fetch prompt images:', e)
+      }
+    }
+
     setPromptForm({
       title: p.title || '',
       slug: p.slug || '',
-      categoryId: p.categoryId || p.category_id || '',
+      categoryId: p.categoryId || p.category_id || (isCategoryAdmin ? assignedCategoryId : ''),
       subcategoryId: p.subcategoryId || p.subcategory_id || '',
       tags: Array.isArray(p.tags) ? p.tags.join(', ') : '',
       description: p.description || '',
       prompt: p.prompt || '',
       featuredImage: p.featuredImage || p.featured_image || '',
       outputImage: p.outputImage || p.output_image || '',
+      images: images || [],
       seoTitle: p.seoTitle || p.seo_title || '',
       seoDescription: p.seoDescription || p.seo_description || '',
       featured: Boolean(p.featured),
       popular: Boolean(p.popular),
       trending: Boolean(p.trending),
       status: p.status || 'published',
+      rejectionReason: p.rejectionReason || p.rejection_reason || '',
     })
+    setDriveUrlInput('')
+    setDirectUrlInput('')
     setUploadError('')
     setShowPromptModal(true)
   }
 
-  function handlePromptTitleChange(val) {
-    const autoSlug = val
+  function handleAutoSlug(title) {
+    const slug = title
       .toLowerCase()
       .trim()
       .replace(/[^\w\s-]/g, '')
       .replace(/[\s_-]+/g, '-')
       .replace(/^-+|-+$/g, '')
-
-    setPromptForm((prev) => ({
-      ...prev,
-      title: val,
-      slug: editingPromptId ? prev.slug : autoSlug,
-    }))
+    setPromptForm((prev) => ({ ...prev, title, slug: prev.slug && editingPromptId ? prev.slug : slug }))
   }
 
-  async function handleFeaturedUpload(file) {
-    if (!file) return
-    try {
-      setUploadingFeatured(true)
-      setUploadError('')
-      const result = await uploadImageToGitHub(file)
-      setPromptForm((prev) => ({ ...prev, featuredImage: result.url }))
-      notify('success', 'Image uploaded to GitHub repo!')
-    } catch (err) {
-      console.error('Featured image upload failed:', err)
-      setUploadError(`Upload error: ${err.message}`)
-    } finally {
-      setUploadingFeatured(false)
+  // Multi-Image Helpers
+  function handleAddDriveImage() {
+    if (!driveUrlInput.trim()) return
+    const converted = formatGoogleDriveImageUrl(driveUrlInput)
+    if (!converted) {
+      setUploadError('Invalid Google Drive share link.')
+      return
     }
+
+    const newImg = {
+      imageUrl: converted,
+      source: 'google_drive',
+      isFeatured: promptForm.images.length === 0,
+      sortOrder: promptForm.images.length,
+    }
+
+    setPromptForm((prev) => {
+      const nextImages = [...prev.images, newImg]
+      return {
+        ...prev,
+        images: nextImages,
+        featuredImage: prev.featuredImage || converted,
+      }
+    })
+    setDriveUrlInput('')
+    setUploadError('')
   }
 
-  async function handleOutputUpload(file) {
+  function handleAddDirectImage() {
+    if (!directUrlInput.trim()) return
+    const url = directUrlInput.trim()
+    const newImg = {
+      imageUrl: url,
+      source: detectImageSource(url),
+      isFeatured: promptForm.images.length === 0,
+      sortOrder: promptForm.images.length,
+    }
+
+    setPromptForm((prev) => {
+      const nextImages = [...prev.images, newImg]
+      return {
+        ...prev,
+        images: nextImages,
+        featuredImage: prev.featuredImage || url,
+      }
+    })
+    setDirectUrlInput('')
+    setUploadError('')
+  }
+
+  function handleSetFeaturedImage(index) {
+    setPromptForm((prev) => {
+      const updated = prev.images.map((img, i) => ({
+        ...img,
+        isFeatured: i === index,
+      }))
+      const featuredUrl = updated[index]?.imageUrl || ''
+      return {
+        ...prev,
+        images: updated,
+        featuredImage: featuredUrl,
+      }
+    })
+  }
+
+  function handleRemoveImage(index) {
+    setPromptForm((prev) => {
+      const updated = prev.images.filter((_, i) => i !== index)
+      if (updated.length > 0 && !updated.some((img) => img.isFeatured)) {
+        updated[0].isFeatured = true
+      }
+      const featuredUrl = updated.find((img) => img.isFeatured)?.imageUrl || ''
+      return {
+        ...prev,
+        images: updated,
+        featuredImage: featuredUrl,
+      }
+    })
+  }
+
+  async function handleFileUpload(file) {
     if (!file) return
     try {
-      setUploadingOutput(true)
+      setUploadingImage(true)
       setUploadError('')
-      const result = await uploadImageToGitHub(file)
-      setPromptForm((prev) => ({ ...prev, outputImage: result.url }))
-      notify('success', 'Output image uploaded!')
+      const rawUrl = await uploadImageToGitHub(file, 'prompts')
+      const newImg = {
+        imageUrl: rawUrl,
+        source: 'github',
+        isFeatured: promptForm.images.length === 0,
+        sortOrder: promptForm.images.length,
+      }
+
+      setPromptForm((prev) => {
+        const nextImages = [...prev.images, newImg]
+        return {
+          ...prev,
+          images: nextImages,
+          featuredImage: prev.featuredImage || rawUrl,
+        }
+      })
     } catch (err) {
-      console.error('Output image upload failed:', err)
-      setUploadError(`Upload error: ${err.message}`)
+      console.error('Upload failed:', err)
+      setUploadError(err.message || 'Image upload failed. Check GitHub settings or use Google Drive link.')
     } finally {
-      setUploadingOutput(false)
+      setUploadingImage(false)
     }
   }
 
   async function handleSavePrompt(e) {
     e.preventDefault()
-    if (!promptForm.title.trim() || !promptForm.prompt.trim()) {
-      notify('error', 'Title and Prompt body are required.')
+    if (!promptForm.title || !promptForm.prompt) {
+      notify('error', 'Title and Prompt text are required.')
       return
     }
 
     try {
       setSubmittingPrompt(true)
-      setUploadError('')
+      const userProfile = profile || { role, assigned_category_id: assignedCategoryId, display_name: user?.email?.split('@')[0] }
 
       const detectedVariables = extractVariables(promptForm.prompt)
-      const parsedTags = promptForm.tags
-        ? promptForm.tags
-            .split(',')
-            .map((t) => t.trim().toLowerCase())
-            .filter(Boolean)
+      const tagsArray = promptForm.tags
+        ? promptForm.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
         : []
 
       const payload = {
-        title: promptForm.title.trim(),
-        slug: promptForm.slug.trim() || promptForm.title.toLowerCase().replace(/\s+/g, '-'),
-        category_id: promptForm.categoryId || null,
-        categoryId: promptForm.categoryId || null,
-        subcategory_id: promptForm.subcategoryId || null,
-        subcategoryId: promptForm.subcategoryId || null,
-        tags: parsedTags,
-        description: promptForm.description.trim(),
-        prompt: promptForm.prompt.trim(),
+        ...promptForm,
         variables: detectedVariables,
-        featured_image: promptForm.featuredImage.trim(),
-        featuredImage: promptForm.featuredImage.trim(),
-        output_image: promptForm.outputImage.trim(),
-        outputImage: promptForm.outputImage.trim(),
-        seo_title: promptForm.seoTitle.trim() || promptForm.title.trim(),
-        seoTitle: promptForm.seoTitle.trim() || promptForm.title.trim(),
-        seo_description: promptForm.seoDescription.trim() || promptForm.description.trim(),
-        seoDescription: promptForm.seoDescription.trim() || promptForm.description.trim(),
-        featured: promptForm.featured,
-        popular: promptForm.popular,
-        trending: promptForm.trending,
-        status: promptForm.status,
+        tags: tagsArray,
+        author: userProfile.display_name || user?.email?.split('@')[0] || 'Admin',
       }
 
       if (editingPromptId) {
-        await updatePrompt(editingPromptId, payload)
-        notify('success', 'Prompt updated successfully!')
+        await updatePrompt(editingPromptId, payload, userProfile)
+        notify('success', isCategoryAdmin ? 'Prompt updated and resubmitted for review!' : 'Prompt updated successfully!')
       } else {
-        await createPrompt(payload)
-        notify('success', 'Prompt published to library!')
+        await createPrompt(payload, userProfile)
+        notify('success', isCategoryAdmin ? 'Prompt submitted! Awaiting Super Admin review.' : 'Prompt created successfully!')
       }
 
       setShowPromptModal(false)
       await loadData()
     } catch (err) {
       console.error('Error saving prompt:', err)
-      setUploadError(`Failed to save prompt: ${err.message}`)
-      notify('error', err.message || 'Error saving prompt')
+      notify('error', err.message || 'Failed to save prompt.')
     } finally {
       setSubmittingPrompt(false)
     }
   }
 
   async function handleDeletePrompt(id, title) {
-    if (window.confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) {
-      try {
-        await deletePrompt(id)
-        setPromptsList((prev) => prev.filter((p) => p.id !== id))
-        notify('success', 'Prompt deleted successfully.')
-        const updatedStats = await getAdminStats()
-        setStats(updatedStats)
-      } catch (err) {
-        notify('error', `Failed to delete prompt: ${err.message}`)
-      }
-    }
-  }
-
-  async function handleTogglePromptStatus(p) {
+    if (!window.confirm(`Are you sure you want to delete "${title}"?`)) return
     try {
-      const newStatus = p.status === 'published' ? 'draft' : 'published'
-      await togglePromptStatus(p.id, p.status)
-      setPromptsList((prev) =>
-        prev.map((item) => (item.id === p.id ? { ...item, status: newStatus } : item))
-      )
-      notify('success', `Prompt status set to ${newStatus}`)
+      await deletePrompt(id)
+      notify('success', 'Prompt deleted.')
+      await loadData()
     } catch (err) {
-      notify('error', `Failed to update status: ${err.message}`)
+      console.error('Error deleting prompt:', err)
+      notify('error', 'Failed to delete prompt.')
     }
   }
 
-  // --- CATEGORY HANDLERS ---
-  function openNewCatModal() {
-    setEditingCatId(null)
-    setCatForm({
-      name: '',
-      slug: '',
-      icon: 'Sparkles',
+  async function handleToggleStatus(id, currentStatus) {
+    if (!isSuperAdmin) {
+      notify('error', 'Only Super Admins can directly toggle publish status.')
+      return
+    }
+    try {
+      await togglePromptStatus(id, currentStatus)
+      notify('success', `Status updated to ${currentStatus === 'published' ? 'draft' : 'published'}.`)
+      await loadData()
+    } catch (err) {
+      console.error('Error toggling prompt status:', err)
+      notify('error', 'Failed to update status.')
+    }
+  }
+
+  // --- APPROVAL WORKFLOW HANDLERS (Super Admin) ---
+  async function handleApprove(id, title) {
+    try {
+      await approvePrompt(id)
+      notify('success', `"${title}" approved and published to public site!`)
+      await loadData()
+    } catch (err) {
+      console.error('Error approving prompt:', err)
+      notify('error', 'Failed to approve prompt.')
+    }
+  }
+
+  function openRejectModal(p) {
+    setRejectModal({
+      show: true,
+      promptId: p.id,
+      promptTitle: p.title,
+      reason: '',
     })
-    setShowCatModal(true)
   }
 
-  function openEditCatModal(cat) {
-    setEditingCatId(cat.id)
-    setCatForm({
-      name: cat.name,
-      slug: cat.slug,
-      icon: cat.icon || 'Sparkles',
-    })
-    setShowCatModal(true)
-  }
-
-  function handleCatNameChange(val) {
-    const autoSlug = val
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-
-    setCatForm((prev) => ({
-      ...prev,
-      name: val,
-      slug: editingCatId ? prev.slug : autoSlug,
-    }))
-  }
-
-  async function handleSaveCategory(e) {
+  async function handleConfirmReject(e) {
     e.preventDefault()
-    if (!catForm.name.trim()) {
-      notify('error', 'Category name is required.')
+    if (!rejectModal.promptId) return
+
+    try {
+      setRejectingLoading(true)
+      await rejectPrompt(rejectModal.promptId, rejectModal.reason)
+      notify('success', `"${rejectModal.promptTitle}" marked as rejected. Feedback saved.`)
+      setRejectModal({ show: false, promptId: null, promptTitle: '', reason: '' })
+      await loadData()
+    } catch (err) {
+      console.error('Error rejecting prompt:', err)
+      notify('error', 'Failed to reject prompt.')
+    } finally {
+      setRejectingLoading(false)
+    }
+  }
+
+  // --- ADMIN MANAGEMENT HANDLERS (Super Admin) ---
+  function openCreateAdminModal() {
+    setAdminModal({
+      show: true,
+      email: '',
+      password: '',
+      displayName: '',
+      role: 'category_admin',
+      assignedCategoryId: categoriesList[0]?.id || '',
+    })
+  }
+
+  async function handleSaveAdmin(e) {
+    e.preventDefault()
+    if (!adminModal.email || !adminModal.password) {
+      notify('error', 'Email and password are required.')
+      return
+    }
+    if (adminModal.password.length < 6) {
+      notify('error', 'Password must be at least 6 characters.')
+      return
+    }
+    if (adminModal.role === 'category_admin' && !adminModal.assignedCategoryId) {
+      notify('error', 'Please assign a category to the category admin.')
       return
     }
 
     try {
+      setSubmittingAdmin(true)
+      await createAdminUser({
+        email: adminModal.email,
+        password: adminModal.password,
+        displayName: adminModal.displayName || adminModal.email.split('@')[0],
+        role: adminModal.role,
+        assignedCategoryId: adminModal.role === 'super_admin' ? null : adminModal.assignedCategoryId,
+      })
+      notify('success', `Admin user "${adminModal.email}" created successfully!`)
+      setAdminModal({ show: false, email: '', password: '', displayName: '', role: 'category_admin', assignedCategoryId: '' })
+      await loadData()
+    } catch (err) {
+      console.error('Error creating admin:', err)
+      notify('error', err.message || 'Failed to create admin user.')
+    } finally {
+      setSubmittingAdmin(false)
+    }
+  }
+
+  async function handleUpdateAdminCategory(adminId, newCatId) {
+    try {
+      await updateAdminProfile(adminId, { assignedCategoryId: newCatId || null })
+      notify('success', 'Admin category assignment updated.')
+      await loadData()
+    } catch (err) {
+      console.error('Error updating admin assignment:', err)
+      notify('error', 'Failed to update assignment.')
+    }
+  }
+
+  async function handleDeleteAdmin(adminId, name) {
+    if (!window.confirm(`Revoke admin privileges for "${name || 'this user'}"?`)) return
+    try {
+      await deleteAdminProfile(adminId)
+      notify('success', 'Admin privileges revoked.')
+      await loadData()
+    } catch (err) {
+      console.error('Error deleting admin profile:', err)
+      notify('error', 'Failed to revoke admin.')
+    }
+  }
+
+  // --- CATEGORIES HANDLERS (Super Admin) ---
+  function openNewCatModal() {
+    setEditingCatId(null)
+    setCatForm({ name: '', slug: '', icon: 'Sparkles' })
+    setShowCatModal(true)
+  }
+
+  function openEditCatModal(c) {
+    setEditingCatId(c.id)
+    setCatForm({ name: c.name, slug: c.slug, icon: c.icon || 'Sparkles' })
+    setShowCatModal(true)
+  }
+
+  async function handleSaveCategory(e) {
+    e.preventDefault()
+    if (!catForm.name) return
+    try {
       setSubmittingCat(true)
       if (editingCatId) {
         await updateCategory(editingCatId, catForm)
-        notify('success', 'Category updated successfully!')
+        notify('success', 'Category updated.')
       } else {
         await createCategory(catForm)
-        notify('success', 'New category added!')
+        notify('success', 'Category created.')
       }
       setShowCatModal(false)
       await loadData()
     } catch (err) {
       console.error('Error saving category:', err)
-      notify('error', `Failed to save category: ${err.message}`)
+      notify('error', 'Failed to save category.')
     } finally {
       setSubmittingCat(false)
     }
   }
 
-  async function handleDeleteCategory(id, name) {
-    if (
-      window.confirm(
-        `Are you sure you want to delete category "${name}"? Prompts in this category will be unassigned.`
-      )
-    ) {
-      try {
-        await deleteCategory(id)
-        setCategoriesList((prev) => prev.filter((c) => c.id !== id))
-        notify('success', 'Category deleted successfully.')
-        const updatedStats = await getAdminStats()
-        setStats(updatedStats)
-      } catch (err) {
-        notify('error', `Failed to delete category: ${err.message}`)
-      }
-    }
-  }
-
-  async function handleAddSubcategory(catId) {
-    if (!newSubcatName.trim()) return
+  async function handleDeleteCat(id, name) {
+    if (!window.confirm(`Delete category "${name}"? Prompts in this category will become unassigned.`)) return
     try {
-      await createSubcategory({
-        categoryId: catId,
-        name: newSubcatName.trim(),
-      })
-      setNewSubcatName('')
-      setSubcatParentId('')
-      notify('success', 'Subcategory created!')
+      await deleteCategory(id)
+      notify('success', 'Category deleted.')
       await loadData()
     } catch (err) {
-      notify('error', `Failed to create subcategory: ${err.message}`)
+      console.error('Error deleting category:', err)
+      notify('error', 'Failed to delete category.')
     }
   }
 
-  // --- MESSAGE HANDLERS ---
-  async function handleToggleMessageRead(msg) {
+  // --- INBOX HANDLERS ---
+  async function handleToggleRead(id, currentRead) {
     try {
-      const updated = await markContactMessageAsRead(msg.id, !msg.read)
-      setMessagesList((prev) =>
-        prev.map((m) => (m.id === msg.id ? { ...m, read: updated.read } : m))
-      )
-      notify('success', updated.read ? 'Marked as read' : 'Marked as unread')
+      await markContactMessageAsRead(id, !currentRead)
+      setMessagesList((prev) => prev.map((m) => (m.id === id ? { ...m, read: !currentRead } : m)))
     } catch (err) {
-      notify('error', `Failed to update message: ${err.message}`)
+      console.error('Error updating read status:', err)
     }
   }
 
   async function handleDeleteMessage(id) {
-    if (window.confirm('Delete this message?')) {
-      try {
-        await deleteContactMessage(id)
-        setMessagesList((prev) => prev.filter((m) => m.id !== id))
-        notify('success', 'Message deleted.')
-      } catch (err) {
-        notify('error', `Failed to delete message: ${err.message}`)
-      }
-    }
-  }
-
-  // --- PROFILE / SECURITY HANDLERS ---
-  async function handleUpdateEmail(e) {
-    e.preventDefault()
-    if (!newEmail || newEmail === user?.email) {
-      notify('error', 'Enter a different email address.')
-      return
-    }
-
     try {
-      setEmailUpdating(true)
-      const { error } = await supabase.auth.updateUser({ email: newEmail.trim() })
-      if (error) throw error
-      notify('success', 'Confirmation link sent to new email! Please check your inbox.')
+      await deleteContactMessage(id)
+      setMessagesList((prev) => prev.filter((m) => m.id !== id))
+      notify('success', 'Message deleted.')
     } catch (err) {
-      notify('error', err.message || 'Failed to update email.')
-    } finally {
-      setEmailUpdating(false)
+      console.error('Error deleting message:', err)
+      notify('error', 'Failed to delete message.')
     }
   }
 
-  async function handleChangePassword(e) {
+  // --- SECURITY / PASSWORD HANDLERS ---
+  async function handleUpdatePassword(e) {
     e.preventDefault()
-    if (!newPassword || newPassword.length < 6) {
-      notify('error', 'Password must be at least 6 characters long.')
-      return
-    }
     if (newPassword !== confirmPassword) {
       notify('error', 'Passwords do not match.')
       return
     }
-
+    if (newPassword.length < 6) {
+      notify('error', 'Password must be at least 6 characters.')
+      return
+    }
     try {
       setPasswordUpdating(true)
       const { error } = await supabase.auth.updateUser({ password: newPassword })
       if (error) throw error
-      notify('success', 'Password updated successfully!')
+      notify('success', 'Password updated successfully.')
       setNewPassword('')
       setConfirmPassword('')
     } catch (err) {
-      notify('error', err.message || 'Failed to change password.')
+      notify('error', err.message || 'Failed to update password.')
     } finally {
       setPasswordUpdating(false)
     }
   }
 
-  // Filtered prompts
+  // Filtered prompts list
   const filteredPrompts = promptsList.filter((p) => {
     const matchesSearch =
-      !searchQuery.trim() ||
       p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.tags && p.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase())))
+      p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (Array.isArray(p.tags) && p.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase())))
 
     const matchesStatus =
       statusFilter === 'all' || p.status === statusFilter
@@ -584,46 +768,65 @@ export default function AdminDashboard() {
   })
 
   const unreadMessagesCount = messagesList.filter((m) => !m.read).length
+  const pendingReviewCount = isSuperAdmin ? pendingList.length : 0
 
   return (
-    <div className="flex min-h-screen bg-base">
-      <SEO title="Admin Console" description="PromptVault Admin Dashboard." />
+    <div className="min-h-screen bg-base text-ink flex flex-col md:flex-row">
+      <SEO title="Admin Dashboard | PromptVault" description="Manage prompts, reviews, and team." />
 
-      {/* MOBILE OVERLAY */}
-      {sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
-        />
-      )}
+      {/* MOBILE TOP BAR */}
+      <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-line bg-surface/80 backdrop-blur-xl sticky top-0 z-40">
+        <div className="flex items-center gap-2">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-violet to-cyan text-white">
+            <Zap size={14} />
+          </span>
+          <span className="font-display font-semibold text-sm text-white">PromptVault</span>
+        </div>
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 rounded-xl border border-line text-ink-muted hover:text-white"
+        >
+          <Menu size={18} />
+        </button>
+      </div>
 
-      {/* ======================= SIDEBAR ======================= */}
+      {/* SIDEBAR NAVIGATION */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col justify-between border-r border-line bg-[#0c0a14] p-5 transition-transform duration-300 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-line bg-surface-2/95 backdrop-blur-2xl p-4 flex flex-col justify-between transition-transform duration-300 md:relative md:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="space-y-6">
-          {/* Sidebar Brand / Header */}
-          <div className="flex items-center justify-between border-b border-line/60 pb-4">
+          {/* Logo */}
+          <div className="flex items-center justify-between px-2 pt-2">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet to-cyan text-white shadow-glow">
-                <ShieldCheck size={20} />
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-violet to-cyan text-white shadow-glow">
+                <Zap size={16} />
               </span>
               <div>
-                <h2 className="font-display font-semibold text-sm text-ink tracking-tight">PromptVault</h2>
-                <p className="text-[10px] text-violet-soft font-mono uppercase font-semibold tracking-wider">Admin Console</p>
+                <span className="font-display font-bold text-sm tracking-tight text-white">PromptVault</span>
+                <span className="block text-[10px] text-cyan font-mono uppercase tracking-wider">
+                  {isSuperAdmin ? 'Super Admin' : 'Category Admin'}
+                </span>
               </div>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden text-ink-muted hover:text-white"
+              className="md:hidden p-1.5 text-ink-faint hover:text-white"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           </div>
 
-          {/* Quick Action Button */}
+          {/* Scoped Category Banner for Category Admins */}
+          {isCategoryAdmin && assignedCategory && (
+            <div className="rounded-xl border border-amber/30 bg-amber/10 p-2.5">
+              <p className="text-[10px] uppercase font-mono tracking-wider text-amber font-semibold">Assigned Category</p>
+              <p className="text-xs font-semibold text-white mt-0.5 truncate">{assignedCategory.name}</p>
+            </div>
+          )}
+
+          {/* Create Button */}
           <button
             onClick={() => {
               openNewPromptModal()
@@ -635,11 +838,11 @@ export default function AdminDashboard() {
           </button>
 
           {/* Navigation Links */}
-          <nav className="space-y-1.5">
+          <nav className="space-y-1">
             <p className="px-3 text-[10px] font-mono uppercase text-ink-faint tracking-wider mb-2 font-semibold">
               Management
             </p>
-            
+
             <SidebarLink
               active={activeTab === 'prompts'}
               onClick={() => {
@@ -651,16 +854,48 @@ export default function AdminDashboard() {
               badge={promptsList.length}
             />
 
-            <SidebarLink
-              active={activeTab === 'categories'}
-              onClick={() => {
-                setActiveTab('categories')
-                setSidebarOpen(false)
-              }}
-              icon={FolderKanban}
-              label="Categories & Tags"
-              badge={categoriesList.length}
-            />
+            {/* Pending Review Queue (Super Admin only) */}
+            {isSuperAdmin && (
+              <SidebarLink
+                active={activeTab === 'pending'}
+                onClick={() => {
+                  setActiveTab('pending')
+                  setSidebarOpen(false)
+                }}
+                icon={CheckSquare}
+                label="Pending Review"
+                badge={pendingReviewCount > 0 ? `${pendingReviewCount} review` : 0}
+                badgeColor="amber"
+              />
+            )}
+
+            {/* Categories (Super Admin only) */}
+            {isSuperAdmin && (
+              <SidebarLink
+                active={activeTab === 'categories'}
+                onClick={() => {
+                  setActiveTab('categories')
+                  setSidebarOpen(false)
+                }}
+                icon={FolderKanban}
+                label="Categories & Tags"
+                badge={categoriesList.length}
+              />
+            )}
+
+            {/* Team & Admins (Super Admin only) */}
+            {isSuperAdmin && (
+              <SidebarLink
+                active={activeTab === 'admins'}
+                onClick={() => {
+                  setActiveTab('admins')
+                  setSidebarOpen(false)
+                }}
+                icon={Users}
+                label="Admin Team"
+                badge={adminsList.length}
+              />
+            )}
 
             <SidebarLink
               active={activeTab === 'messages'}
@@ -683,7 +918,7 @@ export default function AdminDashboard() {
               label="Vault Analytics"
             />
 
-            <p className="px-3 text-[10px] font-mono uppercase text-ink-faint tracking-wider mb-2 mt-6 font-semibold">
+            <p className="px-3 text-[10px] font-mono uppercase text-ink-faint tracking-wider mb-2 mt-5 font-semibold">
               System & Profile
             </p>
 
@@ -703,7 +938,7 @@ export default function AdminDashboard() {
               className="flex items-center justify-between rounded-xl px-3 py-2 text-xs text-ink-muted transition-colors hover:bg-white/[0.04] hover:text-white"
             >
               <div className="flex items-center gap-2.5">
-                <Globe size={16} className="text-cyan" />
+                <Globe size={15} className="text-cyan" />
                 <span>Live Public Site</span>
               </div>
               <ExternalLink size={12} className="text-ink-faint" />
@@ -712,501 +947,455 @@ export default function AdminDashboard() {
         </div>
 
         {/* Sidebar Footer User Card */}
-        <div className="rounded-2xl border border-line/80 bg-white/[0.02] p-3.5 space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet/30 to-cyan/20 border border-violet/30 text-violet-soft font-semibold text-xs">
+        <div className="rounded-2xl border border-line/80 bg-white/[0.02] p-3 space-y-2.5">
+          <div className="flex items-center gap-2.5">
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-violet/30 to-cyan/20 border border-violet/30 text-violet-soft font-semibold text-xs shrink-0">
               {user?.email ? user.email.charAt(0).toUpperCase() : 'A'}
             </div>
             <div className="overflow-hidden">
-              <p className="truncate text-xs font-medium text-ink">{user?.email || 'Admin'}</p>
+              <p className="truncate text-xs font-medium text-white">{profile?.displayName || user?.email || 'Admin'}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-cyan animate-pulse" />
-                <span className="text-[10px] text-cyan font-mono">Super Admin</span>
+                <span className={`h-1.5 w-1.5 rounded-full ${isSuperAdmin ? 'bg-cyan' : 'bg-amber'} animate-pulse`} />
+                <span className="text-[10px] text-ink-muted capitalize">
+                  {isSuperAdmin ? 'Super Admin' : `${assignedCategory?.name || 'Category'} Admin`}
+                </span>
               </div>
             </div>
           </div>
 
           <button
             onClick={() => signOut()}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-line py-1.5 text-xs text-ink-muted transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
+            className="flex items-center gap-2 w-full justify-center rounded-lg border border-line/60 bg-surface/50 py-1.5 text-xs text-ink-muted hover:text-red-400 hover:border-red-500/30 transition-colors"
           >
-            <LogOut size={13} />
-            <span>Sign Out</span>
+            <LogOut size={13} /> Sign Out
           </button>
         </div>
       </aside>
 
-      {/* ======================= MAIN CONTENT VIEW ======================= */}
-      <main className="flex-1 overflow-x-hidden p-4 sm:p-6 md:p-10">
-        {/* Top Action Bar */}
-        <div className="mb-6 sm:mb-8 flex flex-wrap items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="grid h-10 w-10 place-items-center rounded-xl border border-line text-ink-muted hover:text-white lg:hidden"
-            >
-              <Menu size={18} />
-            </button>
-            <div>
-              <h1 className="font-display text-xl sm:text-2xl font-semibold text-ink capitalize tracking-tight">
-                {activeTab === 'prompts' && 'Prompts Library'}
-                {activeTab === 'categories' && 'Categories & Taxonomies'}
-                {activeTab === 'messages' && 'Contact Submissions & Inbox'}
-                {activeTab === 'analytics' && 'Vault Analytics & Metrics'}
-                {activeTab === 'profile' && 'Admin Profile & Security'}
-              </h1>
-              <p className="text-[11px] sm:text-xs text-ink-muted mt-0.5">
-                {activeTab === 'prompts' && 'Manage, publish, edit, and organize all prompts.'}
-                {activeTab === 'categories' && 'Create topic categories and subcategory tags.'}
-                {activeTab === 'messages' && 'Read inquiries, prompt requests, and feedback from visitors.'}
-                {activeTab === 'analytics' && 'Track impressions, copy actions, and trending content.'}
-                {activeTab === 'profile' && 'Change your admin email and password.'}
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Header Actions */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              title="Refresh Data"
-              className="btn-ghost !px-3 !py-2 text-xs flex items-center gap-1.5 min-h-[40px]"
-            >
-              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-
-            {activeTab === 'prompts' && (
-              <button onClick={openNewPromptModal} className="btn-primary !px-3.5 sm:!px-4 !py-2 text-xs flex items-center gap-1.5 shadow-glow min-h-[40px]">
-                <Plus size={14} /> <span className="hidden sm:inline">Add Prompt</span><span className="sm:hidden">New</span>
-              </button>
-            )}
-
-            {activeTab === 'categories' && (
-              <button onClick={openNewCatModal} className="btn-primary !px-3.5 sm:!px-4 !py-2 text-xs flex items-center gap-1.5 shadow-glow min-h-[40px]">
-                <Plus size={14} /> <span className="hidden sm:inline">Add Category</span><span className="sm:hidden">New</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Notification Banner */}
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 min-w-0 p-4 sm:p-6 md:p-8 lg:p-10 space-y-6 overflow-y-auto">
+        {/* Status Toast Notification */}
         {statusMessage.text && (
           <div
-            className={`mb-6 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-xs shadow-lg transition-all animate-fadeIn ${
+            className={`fixed top-4 right-4 z-50 rounded-xl px-4 py-3 shadow-glow text-xs flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-300 ${
               statusMessage.type === 'error'
-                ? 'border-red-500/40 bg-red-500/10 text-red-300'
-                : 'border-cyan/40 bg-cyan/10 text-cyan'
+                ? 'bg-red-500/20 border border-red-500/40 text-red-300'
+                : 'bg-violet/20 border border-violet/40 text-violet-soft'
             }`}
           >
-            {statusMessage.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+            {statusMessage.type === 'error' ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
             <span>{statusMessage.text}</span>
           </div>
         )}
 
-        {/* ======================= TAB 1: PROMPTS ======================= */}
-        {activeTab === 'prompts' && (
-          <div className="space-y-6">
-            {/* KPI Cards Row (2 columns on mobile!) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              <StatCard
-                title="Total Prompts"
-                value={stats.totalPrompts}
-                sublabel={`${promptsList.filter((p) => p.status === 'published').length} Published`}
-                icon={FileText}
-                gradient="from-violet/20 to-violet/5"
-              />
-              <StatCard
-                title="Categories"
-                value={stats.totalCategories}
-                sublabel="Organized topics"
-                icon={FolderKanban}
-                gradient="from-cyan/20 to-cyan/5"
-              />
-              <StatCard
-                title="Total Views"
-                value={stats.totalViews.toLocaleString()}
-                sublabel="Impressions"
-                icon={Eye}
-                gradient="from-amber/20 to-amber/5"
-              />
-              <StatCard
-                title="Copies Generated"
-                value={stats.totalCopies.toLocaleString()}
-                sublabel="User copies"
-                icon={Copy}
-                gradient="from-emerald-500/20 to-emerald-500/5"
-              />
+        {/* TOP HEADER */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line/60 pb-6">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 style={{ color: '#FFFFFF' }} className="font-display text-2xl sm:text-3xl font-semibold text-white">
+                {activeTab === 'prompts' && 'Prompts Library'}
+                {activeTab === 'pending' && 'Pending Review Queue'}
+                {activeTab === 'categories' && 'Categories & Tags'}
+                {activeTab === 'admins' && 'Admin Team Management'}
+                {activeTab === 'messages' && 'Contact Inbox'}
+                {activeTab === 'analytics' && 'Vault Analytics'}
+                {activeTab === 'profile' && 'Account & Security'}
+              </h1>
+              {isCategoryAdmin && assignedCategory && (
+                <span className="chip !border-amber/40 !bg-amber/15 !text-amber text-xs">
+                  {assignedCategory.name} Category
+                </span>
+              )}
             </div>
+            <p style={{ color: '#C8C4E6' }} className="text-xs sm:text-sm text-ink-muted mt-1">
+              {isSuperAdmin
+                ? 'Full system oversight across all categories, permissions, and submissions.'
+                : `Manage prompts and content within your assigned ${assignedCategory?.name || ''} category.`}
+            </p>
+          </div>
 
-            {/* Filters & Search Toolbar */}
-            <div className="glass-card p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="relative w-full md:w-80">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" />
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="btn-ghost !py-2 !px-3 text-xs"
+              title="Refresh Data"
+            >
+              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+            <button
+              onClick={openNewPromptModal}
+              className="btn-primary !py-2 !px-3 text-xs shadow-glow"
+            >
+              <Plus size={14} /> New Prompt
+            </button>
+          </div>
+        </div>
+
+        {/* KPI STATS ROW */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <StatCard
+            title="Total Prompts"
+            value={stats.totalPrompts}
+            icon={FileText}
+            change={isCategoryAdmin ? 'In Category' : 'Published + Drafts'}
+          />
+          {isSuperAdmin ? (
+            <StatCard
+              title="Pending Review"
+              value={stats.pendingCount}
+              icon={CheckSquare}
+              highlight={stats.pendingCount > 0}
+              change="Awaiting Approval"
+            />
+          ) : (
+            <StatCard
+              title="Assigned Category"
+              value={assignedCategory?.name || 'Assigned'}
+              icon={FolderKanban}
+              change="Scoped Access"
+            />
+          )}
+          <StatCard
+            title="Total Views"
+            value={stats.totalViews.toLocaleString()}
+            icon={Eye}
+            change="Across Prompts"
+          />
+          <StatCard
+            title="Total Copies"
+            value={stats.totalCopies.toLocaleString()}
+            icon={Copy}
+            change="User Prompt Runs"
+          />
+        </div>
+
+        {/* ------------------------------------------------------------------ */}
+        {/* TAB 1: PROMPTS LIBRARY                                            */}
+        {/* ------------------------------------------------------------------ */}
+        {activeTab === 'prompts' && (
+          <div className="space-y-4">
+            {/* Search & Filter Bar */}
+            <div className="glass-card p-3 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
                 <input
                   type="text"
+                  placeholder="Search prompts by title, description, or tags..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search prompts, tags, slug..."
-                  className="w-full rounded-lg border border-line bg-white/[0.03] py-2 pl-9 pr-3 text-xs text-ink placeholder:text-ink-faint outline-none focus:border-violet/50"
+                  className="w-full rounded-xl border border-line bg-surface/50 pl-9 pr-3 py-2 text-xs text-white placeholder:text-ink-faint focus:border-violet focus:outline-none"
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+                {/* Status Filter */}
                 <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="rounded-lg border border-line bg-[#12111a] px-3 py-2 text-xs text-ink outline-none focus:border-violet/50 cursor-pointer"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  aria-label="Filter by prompt status"
+                  className="rounded-xl border border-line bg-surface/60 px-3 py-2 text-xs text-ink-muted focus:border-violet focus:outline-none"
                 >
-                  <option value="all">All Categories</option>
-                  {categoriesList.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
+                  <option value="all">All Statuses</option>
+                  <option value="published">Published</option>
+                  <option value="pending">Pending Review</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="draft">Drafts</option>
                 </select>
 
-                <div className="flex rounded-lg border border-line p-0.5 bg-white/[0.02]">
-                  {['all', 'published', 'draft'].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setStatusFilter(s)}
-                      className={`px-3 py-1 text-xs capitalize rounded-md transition-colors ${
-                        statusFilter === s ? 'bg-violet/20 text-violet-soft font-medium' : 'text-ink-muted hover:text-white'
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                {/* Category Filter (Super Admin only, locked for Category Admin) */}
+                {isSuperAdmin && (
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    aria-label="Filter by prompt category"
+                    className="rounded-xl border border-line bg-surface/60 px-3 py-2 text-xs text-ink-muted focus:border-violet focus:outline-none"
+                  >
+                    <option value="all">All Categories</option>
+                    {categoriesList.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
-            {/* Prompts Container */}
-            <div className="glass-card overflow-hidden">
-              {loading ? (
-                <div className="px-5 py-12 text-center text-ink-faint">
-                  <Loader2 size={24} className="mx-auto mb-2 animate-spin text-violet-soft" />
-                  Fetching prompt library from Supabase...
-                </div>
-              ) : filteredPrompts.length === 0 ? (
-                <div className="px-5 py-12 text-center text-ink-muted">
-                  <div className="max-w-xs mx-auto space-y-2">
-                    <p className="font-semibold text-ink">No prompts found</p>
-                    <p className="text-ink-faint text-[11px]">
-                      Try adjusting your filters or click below to create a new prompt.
-                    </p>
-                    <button onClick={openNewPromptModal} className="btn-primary !px-3 !py-1.5 text-xs mt-2">
-                      <Plus size={13} /> Create Prompt
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* MOBILE VIEW (< md): Card List */}
-                  <div className="md:hidden divide-y divide-line/40">
-                    {filteredPrompts.map((p) => {
-                      const cat = categoriesList.find((c) => c.id === p.categoryId || c.id === p.category_id)
-                      return (
-                        <div key={p.id} className="p-4 space-y-3">
-                          <div className="flex items-start gap-3">
-                            {p.featuredImage ? (
-                              <img
-                                src={p.featuredImage}
-                                alt={p.title}
-                                className="h-12 w-14 rounded-lg object-cover border border-line shrink-0"
-                              />
-                            ) : (
-                              <div className="h-12 w-14 rounded-lg bg-surface border border-line flex items-center justify-center text-ink-faint shrink-0">
-                                <FileText size={16} />
-                              </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-medium text-ink text-xs line-clamp-1">
+            {/* Prompts Table & Mobile Card List */}
+            {loading ? (
+              <div className="glass-card p-12 text-center">
+                <Loader2 size={24} className="animate-spin text-violet-soft mx-auto" />
+                <p className="text-xs text-ink-muted mt-2">Loading prompts...</p>
+              </div>
+            ) : filteredPrompts.length === 0 ? (
+              <div className="glass-card p-12 text-center space-y-3">
+                <FileText size={32} className="text-ink-faint mx-auto" />
+                <p style={{ color: '#FFFFFF' }} className="font-display text-sm font-semibold text-white">
+                  No prompts found
+                </p>
+                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted max-w-sm mx-auto">
+                  {searchQuery || statusFilter !== 'all' || categoryFilter !== 'all'
+                    ? 'Try adjusting your filters or search query.'
+                    : 'Create your first prompt to populate the library.'}
+                </p>
+                <button onClick={openNewPromptModal} className="btn-primary !py-2 !px-4 text-xs mx-auto">
+                  <Plus size={14} /> Create Prompt
+                </button>
+              </div>
+            ) : (
+              <div className="glass-card overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-white/[0.02] border-b border-line text-ink-faint uppercase font-mono text-[10px]">
+                      <tr>
+                        <th className="px-4 py-3">Prompt</th>
+                        <th className="px-4 py-3">Category</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Views / Copies</th>
+                        <th className="px-4 py-3">Images</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line/40">
+                      {filteredPrompts.map((p) => (
+                        <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="px-4 py-3.5 max-w-xs sm:max-w-sm">
+                            <div className="flex items-center gap-3">
+                              {p.featuredImage && (
+                                <img
+                                  src={p.featuredImage}
+                                  alt=""
+                                  className="h-10 w-14 rounded-lg object-cover border border-line shrink-0"
+                                />
+                              )}
+                              <div className="min-w-0">
+                                <Link
+                                  to={`/prompt/${p.slug}`}
+                                  target="_blank"
+                                  className="font-medium text-white hover:text-violet-soft truncate block transition-colors"
+                                >
                                   {p.title}
-                                </span>
-                                {p.featured && (
-                                  <span className="rounded bg-violet/20 px-1 py-0.5 text-[9px] text-violet-soft border border-violet/30">
-                                    Featured
-                                  </span>
-                                )}
-                                {p.trending && (
-                                  <span className="rounded bg-amber/20 px-1 py-0.5 text-[9px] text-amber border border-amber/30 flex items-center gap-0.5">
-                                    <Flame size={9} /> Hot
-                                  </span>
+                                </Link>
+                                <p className="text-[11px] text-ink-muted line-clamp-1 mt-0.5">{p.description}</p>
+                                {p.rejectionReason && (
+                                  <div className="mt-1 flex items-center gap-1 text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20 max-w-fit">
+                                    <AlertTriangle size={11} /> Rejection note: {p.rejectionReason}
+                                  </div>
                                 )}
                               </div>
-                              <p className="text-[10px] font-mono text-ink-faint mt-0.5 truncate">
-                                /{p.slug} • {p.variables?.length || 0} vars
-                              </p>
                             </div>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-1 text-[11px] text-ink-muted">
-                            <span className="inline-flex items-center rounded-full border border-line bg-white/[0.03] px-2 py-0.5 text-[10px]">
-                              {cat?.name || 'Uncategorized'}
+                          </td>
+                          <td className="px-4 py-3.5 text-ink-muted">
+                            <span className="chip !py-0.5 !text-[11px]">
+                              {p.category?.name || p.categories?.name || 'Unassigned'}
                             </span>
-                            <button
-                              onClick={() => handleTogglePromptStatus(p)}
-                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium border ${
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span
+                              className={`chip !py-0.5 !text-[10px] font-semibold uppercase ${
                                 p.status === 'published'
-                                  ? 'bg-cyan/10 text-cyan border-cyan/30'
-                                  : 'bg-amber/10 text-amber border-amber/30'
+                                  ? '!border-cyan/30 !bg-cyan/10 !text-cyan'
+                                  : p.status === 'pending'
+                                  ? '!border-amber/40 !bg-amber/15 !text-amber animate-pulse'
+                                  : p.status === 'rejected'
+                                  ? '!border-red-500/40 !bg-red-500/15 !text-red-400'
+                                  : '!border-line !bg-white/[0.04] !text-ink-faint'
                               }`}
                             >
-                              <span className={`h-1.5 w-1.5 rounded-full ${p.status === 'published' ? 'bg-cyan' : 'bg-amber'}`} />
-                              <span className="capitalize">{p.status}</span>
-                            </button>
-                          </div>
-
-                          <div className="flex items-center justify-between border-t border-line/40 pt-2 text-[11px] text-ink-faint">
-                            <div className="flex items-center gap-3">
-                              <span>{(p.views || 0).toLocaleString()} views</span>
-                              <span>{(p.copies || 0).toLocaleString()} copies</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <a
-                                href={`/prompt/${p.slug}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-white"
-                                title="Preview"
-                              >
-                                <ExternalLink size={13} />
-                              </a>
+                              {p.status === 'pending' ? 'Pending Review' : p.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-ink-faint font-mono text-[11px]">
+                            {p.views.toLocaleString()} / {p.copies.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3.5 text-ink-faint">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan">
+                              <ImageIcon size={12} /> {p.images?.length || 1}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {isSuperAdmin && (
+                                <button
+                                  onClick={() => handleToggleStatus(p.id, p.status)}
+                                  className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-white transition-colors"
+                                  title={p.status === 'published' ? 'Unpublish to Draft' : 'Direct Publish'}
+                                >
+                                  {p.status === 'published' ? <Check size={13} className="text-cyan" /> : <Layers size={13} />}
+                                </button>
+                              )}
                               <button
                                 onClick={() => openEditPromptModal(p)}
-                                className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-violet-soft"
-                                title="Edit"
+                                className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-white transition-colors"
+                                title="Edit Prompt"
                               >
                                 <Pencil size={13} />
                               </button>
                               <button
                                 onClick={() => handleDeletePrompt(p.id, p.title)}
-                                className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-red-400"
-                                title="Delete"
+                                className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-red-400 transition-colors"
+                                title="Delete Prompt"
                               >
                                 <Trash2 size={13} />
                               </button>
                             </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {/* DESKTOP VIEW (>= md): Full Table */}
-                  <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="border-b border-line bg-white/[0.02] text-ink-faint uppercase font-mono tracking-wider">
-                        <tr>
-                          <th className="px-5 py-3.5">Prompt Details</th>
-                          <th className="px-5 py-3.5">Category</th>
-                          <th className="px-5 py-3.5">Status</th>
-                          <th className="px-5 py-3.5 text-center">Views</th>
-                          <th className="px-5 py-3.5 text-center">Copies</th>
-                          <th className="px-5 py-3.5 text-right">Actions</th>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-line/40">
-                        {filteredPrompts.map((p) => {
-                          const cat = categoriesList.find((c) => c.id === p.categoryId || c.id === p.category_id)
-                          return (
-                            <tr key={p.id} className="hover:bg-white/[0.02] transition-colors group">
-                              <td className="px-5 py-4">
-                                <div className="flex items-center gap-3">
-                                  {p.featuredImage ? (
-                                    <img
-                                      src={p.featuredImage}
-                                      alt={p.title}
-                                      className="h-10 w-14 rounded-lg object-cover border border-line shrink-0"
-                                    />
-                                  ) : (
-                                    <div className="h-10 w-14 rounded-lg bg-surface border border-line flex items-center justify-center text-ink-faint shrink-0">
-                                      <FileText size={16} />
-                                    </div>
-                                  )}
-                                  <div>
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="font-medium text-ink text-sm group-hover:text-violet-soft transition-colors">
-                                        {p.title}
-                                      </span>
-                                      {p.featured && (
-                                        <span className="rounded bg-violet/20 px-1.5 py-0.5 text-[10px] text-violet-soft border border-violet/30">
-                                          Featured
-                                        </span>
-                                      )}
-                                      {p.trending && (
-                                        <span className="rounded bg-amber/20 px-1.5 py-0.5 text-[10px] text-amber border border-amber/30 flex items-center gap-0.5">
-                                          <Flame size={10} /> Hot
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-ink-faint">
-                                      <span className="font-mono">/{p.slug}</span>
-                                      <span>•</span>
-                                      <span>{p.variables?.length || 0} variables</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-
-                              <td className="px-5 py-4">
-                                <span className="inline-flex items-center gap-1 rounded-full border border-line bg-white/[0.03] px-2.5 py-1 text-xs text-ink-muted">
-                                  {cat?.name || 'Uncategorized'}
-                                </span>
-                              </td>
-
-                              <td className="px-5 py-4">
-                                <button
-                                  onClick={() => handleTogglePromptStatus(p)}
-                                  title="Click to toggle published status"
-                                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer transition-all border ${
-                                    p.status === 'published'
-                                      ? 'bg-cyan/10 text-cyan border-cyan/30 hover:bg-cyan/20'
-                                      : 'bg-amber/10 text-amber border-amber/30 hover:bg-amber/20'
-                                  }`}
-                                >
-                                  <span className={`h-1.5 w-1.5 rounded-full ${p.status === 'published' ? 'bg-cyan' : 'bg-amber'}`} />
-                                  <span className="capitalize">{p.status}</span>
-                                </button>
-                              </td>
-
-                              <td className="px-5 py-4 text-center font-mono text-ink-muted">
-                                {(p.views || 0).toLocaleString()}
-                              </td>
-
-                              <td className="px-5 py-4 text-center font-mono text-ink-muted">
-                                {(p.copies || 0).toLocaleString()}
-                              </td>
-
-                              <td className="px-5 py-4 text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <a
-                                    href={`/prompt/${p.slug}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    title="Preview live prompt"
-                                    className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-white hover:border-violet/40 transition-colors"
-                                  >
-                                    <ExternalLink size={14} />
-                                  </a>
-                                  <button
-                                    onClick={() => openEditPromptModal(p)}
-                                    title="Edit prompt"
-                                    className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-violet-soft hover:border-violet/40 transition-colors"
-                                  >
-                                    <Pencil size={14} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeletePrompt(p.id, p.title)}
-                                    title="Delete prompt"
-                                    className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-red-400 hover:border-red-400/40 transition-colors"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-            </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* ======================= TAB 2: CATEGORIES ======================= */}
-        {activeTab === 'categories' && (
-          <div className="space-y-6">
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {categoriesList.map((cat) => (
-                <div key={cat.id} className="glass-card p-5 space-y-4 hover:border-violet/40 transition-all flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-violet/20 to-cyan/10 border border-line text-violet-soft">
-                          <FolderKanban size={18} />
-                        </span>
-                        <div>
-                          <h3 className="font-display font-semibold text-ink text-base">{cat.name}</h3>
-                          <span className="text-[11px] font-mono text-ink-faint">/{cat.slug}</span>
+        {/* ------------------------------------------------------------------ */}
+        {/* TAB 2: PENDING REVIEW QUEUE (Super Admin Only)                    */}
+        {/* ------------------------------------------------------------------ */}
+        {activeTab === 'pending' && isSuperAdmin && (
+          <div className="space-y-4">
+            <div className="glass-card p-4 sm:p-5 flex items-center justify-between border-amber/30 bg-amber/[0.03]">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber/15 border border-amber/30 text-amber">
+                  <CheckSquare size={20} />
+                </span>
+                <div>
+                  <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-sm sm:text-base text-white">
+                    Approval Workflow Queue
+                  </h3>
+                  <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                    Prompts submitted by Category Admins that require Super Admin approval before going live.
+                  </p>
+                </div>
+              </div>
+              <span className="chip !border-amber/40 !bg-amber/20 !text-amber font-mono font-semibold">
+                {pendingList.length} Pending
+              </span>
+            </div>
+
+            {pendingList.length === 0 ? (
+              <div className="glass-card p-12 text-center space-y-2">
+                <CheckCircle2 size={32} className="text-cyan mx-auto" />
+                <p style={{ color: '#FFFFFF' }} className="font-display text-sm font-semibold text-white">
+                  Inbox zero!
+                </p>
+                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                  All category admin submissions have been reviewed and approved.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {pendingList.map((p) => (
+                  <div key={p.id} className="glass-card p-4 sm:p-5 space-y-4 border-l-4 border-l-amber">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="chip !border-amber/40 !bg-amber/15 !text-amber text-[10px] uppercase font-semibold">
+                            Pending Review
+                          </span>
+                          <span className="chip !py-0.5 !text-[11px]">
+                            {p.category?.name || 'Unassigned'}
+                          </span>
+                          <span className="text-[11px] text-ink-faint font-mono">
+                            Submitted by {p.author || 'Admin'} · {p.createdAt || 'Recently'}
+                          </span>
                         </div>
+                        <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-base sm:text-lg text-white">
+                          {p.title}
+                        </h3>
+                        <p style={{ color: '#C8C4E6' }} className="text-xs sm:text-sm text-ink-muted mt-1 leading-relaxed">
+                          {p.description}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-1">
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2 shrink-0">
                         <button
-                          onClick={() => openEditCatModal(cat)}
-                          title="Edit Category"
-                          className="grid h-7 w-7 place-items-center rounded-md border border-line text-ink-muted hover:text-white"
+                          onClick={() => handleApprove(p.id, p.title)}
+                          className="btn-primary !py-2 !px-3 text-xs bg-cyan hover:bg-cyan/80 text-black font-semibold"
                         >
-                          <Pencil size={12} />
+                          <CheckCircle size={14} /> Approve & Publish
                         </button>
                         <button
-                          onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                          title="Delete Category"
-                          className="grid h-7 w-7 place-items-center rounded-md border border-line text-ink-muted hover:text-red-400"
+                          onClick={() => openRejectModal(p)}
+                          className="btn-ghost !py-2 !px-3 text-xs text-red-400 hover:bg-red-500/10 hover:border-red-500/30"
                         >
-                          <Trash2 size={12} />
+                          <XCircle size={14} /> Reject
+                        </button>
+                        <button
+                          onClick={() => openEditPromptModal(p)}
+                          className="btn-ghost !py-2 !px-3 text-xs"
+                        >
+                          <Pencil size={14} /> Edit
                         </button>
                       </div>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between border-t border-line/60 pt-3 text-xs text-ink-muted">
-                      <span>Assigned Prompts:</span>
-                      <span className="font-mono text-white font-medium">{cat.count || 0} prompts</span>
+                    {/* Preview Box */}
+                    <div className="rounded-xl border border-line bg-surface/50 p-3.5 space-y-2">
+                      <p className="text-[10px] font-mono uppercase tracking-wider text-ink-faint font-semibold">
+                        Prompt Template Preview
+                      </p>
+                      <pre className="font-mono text-xs text-ink/90 whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
+                        {p.prompt}
+                      </pre>
                     </div>
-
-                    {/* Subcategory Add Inline */}
-                    {subcatParentId === cat.id ? (
-                      <div className="mt-3 flex gap-1.5">
-                        <input
-                          type="text"
-                          value={newSubcatName}
-                          onChange={(e) => setNewSubcatName(e.target.value)}
-                          placeholder="Subcategory name"
-                          className="w-full rounded-lg border border-line bg-white/[0.04] px-2.5 py-1 text-xs text-ink outline-none focus:border-violet/50"
-                        />
-                        <button
-                          onClick={() => handleAddSubcategory(cat.id)}
-                          className="btn-primary !px-2.5 !py-1 text-[11px]"
-                        >
-                          Add
-                        </button>
-                        <button
-                          onClick={() => setSubcatParentId('')}
-                          className="btn-ghost !px-2 !py-1 text-[11px]"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setSubcatParentId(cat.id)
-                          setNewSubcatName('')
-                        }}
-                        className="mt-3 text-[11px] text-violet-soft hover:text-white flex items-center gap-1 transition-colors"
-                      >
-                        <Plus size={12} /> Add subcategory tag
-                      </button>
-                    )}
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-                  <div className="pt-2 border-t border-line/40 flex items-center justify-between text-[11px] text-ink-faint">
-                    <span>Icon: <span className="font-mono text-ink-muted">{cat.icon}</span></span>
-                    <a
-                      href={`/category/${cat.slug}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-violet-soft hover:underline flex items-center gap-1"
+        {/* ------------------------------------------------------------------ */}
+        {/* TAB 3: CATEGORIES & TAGS (Super Admin Only)                       */}
+        {/* ------------------------------------------------------------------ */}
+        {activeTab === 'categories' && isSuperAdmin && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-lg text-white">
+                  Categories ({categoriesList.length})
+                </h2>
+                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                  Create and organize top-level prompt families.
+                </p>
+              </div>
+              <button onClick={openNewCatModal} className="btn-primary !py-2 !px-3 text-xs">
+                <Plus size={14} /> Add Category
+              </button>
+            </div>
+
+            <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+              {categoriesList.map((cat) => (
+                <div key={cat.id} className="glass-card p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-violet/10 border border-line text-violet-soft">
+                      <Sparkles size={18} />
+                    </span>
+                    <div>
+                      <h4 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-sm text-white">
+                        {cat.name}
+                      </h4>
+                      <p className="text-[11px] text-ink-faint">{cat.count || 0} published prompts</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => openEditCatModal(cat)}
+                      className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-white"
                     >
-                      View Live <ExternalLink size={10} />
-                    </a>
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCat(cat.id, cat.name)}
+                      className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-red-400"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1214,96 +1403,166 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ======================= TAB 3: CONTACT INBOX ======================= */}
-        {activeTab === 'messages' && (
+        {/* ------------------------------------------------------------------ */}
+        {/* TAB 4: ADMIN TEAM MANAGEMENT (Super Admin Only)                   */}
+        {/* ------------------------------------------------------------------ */}
+        {activeTab === 'admins' && isSuperAdmin && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-display font-semibold text-ink text-base">Visitor Messages & Feedback</h3>
-                <p className="text-xs text-ink-muted mt-0.5">
-                  Submissions sent through the public Contact page.
+                <h2 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-lg text-white">
+                  Admin Team & Category Permissions ({adminsList.length})
+                </h2>
+                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                  Create admin accounts, assign roles, and scope category access.
                 </p>
               </div>
-              <span className="text-xs text-ink-faint font-mono">
-                {messagesList.length} total message{messagesList.length !== 1 ? 's' : ''}
-              </span>
+              <button onClick={openCreateAdminModal} className="btn-primary !py-2 !px-3 text-xs shadow-glow">
+                <Plus size={14} /> Invite New Admin
+              </button>
             </div>
 
-            {loading ? (
-              <div className="glass-card p-10 text-center text-xs text-ink-faint">
-                <Loader2 size={20} className="mx-auto mb-2 animate-spin text-violet-soft" />
-                Loading messages...
+            <div className="glass-card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-white/[0.02] border-b border-line text-ink-faint uppercase font-mono text-[10px]">
+                    <tr>
+                      <th className="px-4 py-3">Admin</th>
+                      <th className="px-4 py-3">Role</th>
+                      <th className="px-4 py-3">Assigned Category Scope</th>
+                      <th className="px-4 py-3">Created</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line/40">
+                    {adminsList.map((adm) => (
+                      <tr key={adm.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="grid h-8 w-8 place-items-center rounded-xl bg-violet/20 text-violet-soft font-bold text-xs shrink-0">
+                              {adm.displayName?.charAt(0).toUpperCase() || 'A'}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-white">{adm.displayName || 'Admin User'}</p>
+                              <p className="text-[11px] text-ink-faint font-mono">{adm.email || adm.id}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span
+                            className={`chip !py-0.5 !text-[10px] font-semibold uppercase ${
+                              adm.role === 'super_admin'
+                                ? '!border-cyan/40 !bg-cyan/15 !text-cyan'
+                                : '!border-amber/40 !bg-amber/15 !text-amber'
+                            }`}
+                          >
+                            {adm.role === 'super_admin' ? 'Super Admin' : 'Category Admin'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {adm.role === 'super_admin' ? (
+                            <span className="text-ink-muted text-xs">All Categories (Unrestricted)</span>
+                          ) : (
+                            <select
+                              value={adm.assignedCategoryId || ''}
+                              onChange={(e) => handleUpdateAdminCategory(adm.id, e.target.value)}
+                              aria-label="Change admin assigned category"
+                              className="rounded-lg border border-line bg-surface/60 px-2.5 py-1 text-xs text-white focus:border-violet focus:outline-none"
+                            >
+                              <option value="">Unassigned</option>
+                              {categoriesList.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-ink-faint font-mono text-[11px]">
+                          {adm.createdAt ? new Date(adm.createdAt).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="px-4 py-3.5 text-right">
+                          <button
+                            onClick={() => handleDeleteAdmin(adm.id, adm.displayName)}
+                            className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-red-400 transition-colors"
+                            title="Revoke Admin Access"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ) : messagesList.length === 0 ? (
-              <div className="glass-card p-12 text-center text-ink-muted space-y-2">
-                <Inbox size={32} className="mx-auto text-ink-faint mb-2" />
-                <p className="font-semibold text-ink text-sm">Inbox is empty</p>
-                <p className="text-xs text-ink-faint max-w-sm mx-auto">
-                  When visitors submit inquiries or prompt requests on the Contact page, they will appear here.
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------------ */}
+        {/* TAB 5: CONTACT INBOX                                              */}
+        {/* ------------------------------------------------------------------ */}
+        {activeTab === 'messages' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-lg text-white">
+                  Messages Inbox ({messagesList.length})
+                </h2>
+                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                  Direct inquiries from the public contact page.
+                </p>
+              </div>
+            </div>
+
+            {messagesList.length === 0 ? (
+              <div className="glass-card p-12 text-center space-y-2">
+                <Inbox size={32} className="text-ink-faint mx-auto" />
+                <p style={{ color: '#FFFFFF' }} className="font-display text-sm font-semibold text-white">
+                  No messages yet
+                </p>
+                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                  When visitors submit the contact form, their notes will appear here.
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid gap-3.5">
                 {messagesList.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`glass-card p-5 transition-all border ${
-                      msg.read ? 'border-line/60 bg-white/[0.01]' : 'border-violet/40 bg-violet/[0.03] shadow-glow'
+                    className={`glass-card p-4 sm:p-5 transition-all ${
+                      msg.read ? 'opacity-70' : 'border-violet/40 shadow-glow'
                     }`}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-line/40 pb-3 mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="grid h-9 w-9 place-items-center rounded-xl bg-surface border border-line text-violet-soft shrink-0">
-                          <MessageSquare size={16} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-ink text-sm">{msg.name}</span>
-                            {!msg.read && (
-                              <span className="rounded-full bg-cyan/20 px-2 py-0.5 text-[10px] font-medium text-cyan border border-cyan/30">
-                                New
-                              </span>
-                            )}
-                          </div>
-                          <a
-                            href={`mailto:${msg.email}?subject=Re:%20PromptVault%20Inquiry`}
-                            className="text-xs text-violet-soft hover:underline font-mono"
-                          >
-                            {msg.email}
-                          </a>
-                        </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className={`h-2 w-2 rounded-full ${msg.read ? 'bg-ink-faint' : 'bg-cyan animate-pulse'}`}
+                        />
+                        <span className="font-semibold text-white text-xs sm:text-sm">{msg.name}</span>
+                        <span className="text-[11px] text-ink-faint font-mono">({msg.email})</span>
                       </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-auto">
-                        <span className="text-[11px] text-ink-faint flex items-center gap-1 font-mono mr-2">
-                          <Clock size={11} />
-                          {msg.created_at ? new Date(msg.created_at).toLocaleDateString() : 'Recent'}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-ink-faint font-mono">
+                          {msg.created_at ? new Date(msg.created_at).toLocaleString() : ''}
                         </span>
-                        <a
-                          href={`mailto:${msg.email}?subject=Re:%20PromptVault%20Inquiry`}
-                          className="grid h-7 w-7 place-items-center rounded-lg border border-line text-ink-muted hover:text-white"
-                          title="Reply via Email"
-                        >
-                          <Send size={12} />
-                        </a>
                         <button
-                          onClick={() => handleToggleMessageRead(msg)}
-                          className="grid h-7 w-7 place-items-center rounded-lg border border-line text-ink-muted hover:text-cyan"
-                          title={msg.read ? 'Mark as Unread' : 'Mark as Read'}
+                          onClick={() => handleToggleRead(msg.id, msg.read)}
+                          className="p-1 rounded-md border border-line text-ink-muted hover:text-white"
+                          title={msg.read ? 'Mark Unread' : 'Mark Read'}
                         >
-                          <Check size={13} className={msg.read ? 'text-cyan' : ''} />
+                          <Check size={12} />
                         </button>
                         <button
                           onClick={() => handleDeleteMessage(msg.id)}
-                          className="grid h-7 w-7 place-items-center rounded-lg border border-line text-ink-muted hover:text-red-400"
-                          title="Delete message"
+                          className="p-1 rounded-md border border-line text-ink-muted hover:text-red-400"
+                          title="Delete Message"
                         >
                           <Trash2 size={12} />
                         </button>
                       </div>
                     </div>
-
-                    <p className="text-xs text-ink-muted whitespace-pre-wrap leading-relaxed">
+                    <p className="text-xs sm:text-sm text-ink-muted leading-relaxed whitespace-pre-wrap pl-4 border-l border-line/60">
                       {msg.message}
                     </p>
                   </div>
@@ -1313,404 +1572,460 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ======================= TAB 4: ANALYTICS ======================= */}
+        {/* ------------------------------------------------------------------ */}
+        {/* TAB 6: VAULT ANALYTICS                                            */}
+        {/* ------------------------------------------------------------------ */}
         {activeTab === 'analytics' && (
           <div className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="glass-card p-6 border-line">
-                <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>Conversion / Copy Rate</span>
-                  <TrendingUp size={16} className="text-cyan" />
-                </div>
-                <p className="mt-3 font-display text-3xl font-semibold text-ink">
-                  {stats.totalViews > 0
-                    ? `${((stats.totalCopies / stats.totalViews) * 100).toFixed(1)}%`
-                    : '0%'}
-                </p>
-                <p className="text-[11px] text-ink-faint mt-1">Copies generated per view</p>
-              </div>
+            <div className="glass-card p-5 sm:p-6 space-y-4">
+              <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-base sm:text-lg text-white">
+                Content Engagement Overview
+              </h3>
+              <p style={{ color: '#C8C4E6' }} className="text-xs sm:text-sm text-ink-muted">
+                Tracking runs, copies, and views across published prompts.
+              </p>
 
-              <div className="glass-card p-6 border-line">
-                <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>Avg. Copies / Prompt</span>
-                  <Copy size={16} className="text-violet-soft" />
+              <div className="grid sm:grid-cols-3 gap-4 pt-4 border-t border-line/60">
+                <div className="glass-card p-4 text-center">
+                  <p className="text-[11px] text-ink-faint uppercase font-mono">Total Prompts</p>
+                  <p className="font-display text-2xl font-bold text-white mt-1">{stats.totalPrompts}</p>
                 </div>
-                <p className="mt-3 font-display text-3xl font-semibold text-ink">
-                  {stats.totalPrompts > 0
-                    ? Math.round(stats.totalCopies / stats.totalPrompts).toLocaleString()
-                    : '0'}
-                </p>
-                <p className="text-[11px] text-ink-faint mt-1">Across all published prompts</p>
-              </div>
-
-              <div className="glass-card p-6 border-line">
-                <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>Avg. Views / Prompt</span>
-                  <Eye size={16} className="text-amber" />
+                <div className="glass-card p-4 text-center">
+                  <p className="text-[11px] text-ink-faint uppercase font-mono">Prompt Copies</p>
+                  <p className="font-display text-2xl font-bold text-cyan mt-1">{stats.totalCopies.toLocaleString()}</p>
                 </div>
-                <p className="mt-3 font-display text-3xl font-semibold text-ink">
-                  {stats.totalPrompts > 0
-                    ? Math.round(stats.totalViews / stats.totalPrompts).toLocaleString()
-                    : '0'}
-                </p>
-                <p className="text-[11px] text-ink-faint mt-1">Impressions per prompt item</p>
-              </div>
-            </div>
-
-            {/* Top performing prompts */}
-            <div className="glass-card p-6 space-y-4">
-              <h3 className="font-display font-semibold text-ink">Top 5 Most Popular Prompts</h3>
-              <div className="space-y-3">
-                {[...promptsList]
-                  .sort((a, b) => (b.views || 0) - (a.views || 0))
-                  .slice(0, 5)
-                  .map((p, i) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-line/40"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-xs font-semibold text-violet-soft">#{i + 1}</span>
-                        <div>
-                          <p className="font-medium text-ink text-xs">{p.title}</p>
-                          <p className="text-[10px] text-ink-faint font-mono">/{p.slug}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-6 text-xs font-mono text-ink-muted">
-                        <span>{(p.views || 0).toLocaleString()} views</span>
-                        <span className="text-cyan">{(p.copies || 0).toLocaleString()} copies</span>
-                      </div>
-                    </div>
-                  ))}
+                <div className="glass-card p-4 text-center">
+                  <p className="text-[11px] text-ink-faint uppercase font-mono">Total Views</p>
+                  <p className="font-display text-2xl font-bold text-violet-soft mt-1">{stats.totalViews.toLocaleString()}</p>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ======================= TAB 5: PROFILE & SECURITY ======================= */}
+        {/* ------------------------------------------------------------------ */}
+        {/* TAB 7: ACCOUNT & SECURITY                                         */}
+        {/* ------------------------------------------------------------------ */}
         {activeTab === 'profile' && (
-          <div className="max-w-2xl space-y-6">
-            <div className="glass-card p-6">
-              <div className="flex items-center gap-4">
-                <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-violet to-cyan text-white shadow-glow">
-                  <User size={24} />
-                </div>
+          <div className="max-w-xl space-y-6">
+            <div className="glass-card p-5 sm:p-6 space-y-4">
+              <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-base sm:text-lg text-white">
+                Security & Password
+              </h3>
+              <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                Update your login credentials.
+              </p>
+
+              <form onSubmit={handleUpdatePassword} className="space-y-3.5 pt-2">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-display font-semibold text-ink text-base">{user?.email}</h3>
-                    <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-                      Super Admin
-                    </span>
-                  </div>
-                  <p className="text-xs text-ink-faint font-mono mt-0.5">UID: {user?.id}</p>
+                  <label className="block text-xs text-ink-muted mb-1">New Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-xs text-white focus:border-violet focus:outline-none"
+                  />
                 </div>
-              </div>
-            </div>
 
-            <div className="glass-card p-6 space-y-4">
-              <div className="flex items-center gap-2">
-                <Mail size={16} className="text-violet-soft" />
-                <h3 className="font-display font-semibold text-ink text-sm">Update Admin Email</h3>
-              </div>
-              <form onSubmit={handleUpdateEmail} className="space-y-3">
-                <input
-                  type="email"
-                  required
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="newadmin@promptvault.com"
-                  className="w-full rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs text-ink outline-none focus:border-violet/50"
-                />
-                <button
-                  type="submit"
-                  disabled={emailUpdating}
-                  className="btn-primary !px-4 !py-2 text-xs"
-                >
-                  {emailUpdating ? 'Sending link...' : 'Update Email Address'}
-                </button>
-              </form>
-            </div>
+                <div>
+                  <label className="block text-xs text-ink-muted mb-1">Confirm New Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-xs text-white focus:border-violet focus:outline-none"
+                  />
+                </div>
 
-            <div className="glass-card p-6 space-y-4">
-              <div className="flex items-center gap-2">
-                <Lock size={16} className="text-cyan" />
-                <h3 className="font-display font-semibold text-ink text-sm">Update Password</h3>
-              </div>
-              <form onSubmit={handleChangePassword} className="space-y-3">
-                <input
-                  type="password"
-                  required
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="New Password (min 6 characters)"
-                  className="w-full rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs text-ink outline-none focus:border-violet/50"
-                />
-                <input
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm New Password"
-                  className="w-full rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs text-ink outline-none focus:border-violet/50"
-                />
                 <button
                   type="submit"
                   disabled={passwordUpdating}
-                  className="btn-primary !px-4 !py-2 text-xs"
+                  className="btn-primary !py-2 text-xs w-full justify-center"
                 >
-                  {passwordUpdating ? 'Updating...' : 'Change Password'}
+                  {passwordUpdating ? <Loader2 size={14} className="animate-spin" /> : 'Update Password'}
                 </button>
               </form>
-            </div>
-
-            {/* Session Management Card */}
-            <div className="glass-card p-6 border-red-500/20 space-y-3">
-              <div className="flex items-center gap-2">
-                <LogOut size={16} className="text-red-400" />
-                <h3 className="font-display font-semibold text-ink text-sm">Session Management</h3>
-              </div>
-              <p className="text-xs text-ink-muted">
-                Sign out of your active admin session on this device.
-              </p>
-              <button
-                type="button"
-                onClick={() => signOut()}
-                className="btn-ghost !px-4 !py-2 text-xs text-red-400 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 flex items-center gap-1.5"
-              >
-                <LogOut size={14} /> Sign Out of Admin Console
-              </button>
             </div>
           </div>
         )}
       </main>
 
-      {/* ======================= MODAL: ADD / EDIT PROMPT ======================= */}
+      {/* ------------------------------------------------------------------ */}
+      {/* MODAL 1: ADD / EDIT PROMPT (Multi-Image + Google Drive)           */}
+      {/* ------------------------------------------------------------------ */}
       {showPromptModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
-          <div className="glass-card w-full max-w-3xl p-4 sm:p-6 md:p-8 relative max-h-[90vh] overflow-y-auto animate-fadeIn border-violet/30 shadow-glow">
-            <div className="flex items-center justify-between border-b border-line pb-3 sm:pb-4 mb-4 sm:mb-6">
-              <div className="flex items-center gap-2 sm:gap-2.5">
-                <span className="grid h-8 w-8 place-items-center rounded-lg bg-violet/20 text-violet-soft border border-violet/30 shrink-0">
-                  <FileText size={16} />
-                </span>
-                <div>
-                  <h2 className="font-display font-semibold text-base sm:text-lg text-ink">
-                    {editingPromptId ? 'Edit Prompt' : 'Create New Prompt'}
-                  </h2>
-                  <p className="text-[11px] sm:text-xs text-ink-muted">Define prompt parameters, auto-variables, and SEO tags.</p>
-                </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="glass-card w-full max-w-3xl my-8 p-5 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-line pb-4">
+              <div>
+                <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-lg text-white">
+                  {editingPromptId ? 'Edit Prompt' : 'Create New Prompt'}
+                </h3>
+                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted mt-0.5">
+                  {isCategoryAdmin
+                    ? 'Submitting will place this prompt into the Super Admin approval queue.'
+                    : 'Configure variables, categories, images, and publish status.'}
+                </p>
               </div>
               <button
                 onClick={() => setShowPromptModal(false)}
-                className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:text-white"
+                className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-white"
               >
                 <X size={16} />
               </button>
             </div>
 
-            {uploadError && (
-              <div className="mb-5 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300 flex items-center gap-2">
-                <AlertCircle size={15} />
-                <span>{uploadError}</span>
+            {/* Rejection notice if previously rejected */}
+            {promptForm.rejectionReason && (
+              <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300 flex items-start gap-2">
+                <AlertTriangle size={16} className="shrink-0 mt-0.5 text-red-400" />
+                <div>
+                  <p className="font-semibold text-red-200">Rejection Feedback:</p>
+                  <p className="mt-0.5 leading-relaxed">{promptForm.rejectionReason}</p>
+                </div>
               </div>
             )}
 
-            <form onSubmit={handleSavePrompt} className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-ink-muted">Prompt Title *</label>
+            <form onSubmit={handleSavePrompt} className="space-y-4 text-xs">
+              {/* Title & Slug */}
+              <div className="grid sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-ink-muted mb-1 font-medium">Prompt Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={promptForm.title}
+                    onChange={(e) => handleAutoSlug(e.target.value)}
+                    placeholder="e.g. High-Converting Facebook Ad Copy"
+                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-ink-muted mb-1 font-medium">URL Slug *</label>
+                  <input
+                    type="text"
+                    required
+                    value={promptForm.slug}
+                    onChange={(e) => setPromptForm({ ...promptForm, slug: e.target.value })}
+                    placeholder="e.g. high-converting-facebook-ad-copy"
+                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white font-mono focus:border-violet focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Category & Subcategory */}
+              <div className="grid sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-ink-muted mb-1 font-medium">
+                    Category * {isCategoryAdmin && '(Locked to your assigned category)'}
+                  </label>
+                  <select
+                    disabled={isCategoryAdmin}
+                    value={promptForm.categoryId}
+                    onChange={(e) => setPromptForm({ ...promptForm, categoryId: e.target.value, subcategoryId: '' })}
+                    aria-label="Select prompt category"
+                    className={`w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-white focus:border-violet focus:outline-none ${
+                      isCategoryAdmin ? 'opacity-70 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {categoriesList.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-ink-muted mb-1 font-medium">Subcategory (Optional)</label>
+                  <select
+                    value={promptForm.subcategoryId}
+                    onChange={(e) => setPromptForm({ ...promptForm, subcategoryId: e.target.value })}
+                    aria-label="Select prompt subcategory"
+                    className="w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                  >
+                    <option value="">None / General</option>
+                    {subcategoriesList.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="block text-ink-muted mb-1 font-medium">Tags (comma-separated)</label>
                 <input
-                  value={promptForm.title}
-                  onChange={(e) => handlePromptTitleChange(e.target.value)}
-                  placeholder="e.g. High-Converting Facebook Ad Copy"
-                  required
-                  className="w-full rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs text-ink placeholder:text-ink-faint outline-none focus:border-violet/50"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-ink-muted">Slug (URL identifier) *</label>
-                <input
-                  value={promptForm.slug}
-                  onChange={(e) => setPromptForm((prev) => ({ ...prev, slug: e.target.value }))}
-                  placeholder="high-converting-facebook-ad-copy"
-                  required
-                  className="w-full rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs text-ink placeholder:text-ink-faint outline-none focus:border-violet/50 font-mono"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-ink-muted">Category *</label>
-                <select
-                  value={promptForm.categoryId}
-                  onChange={(e) =>
-                    setPromptForm((prev) => ({ ...prev, categoryId: e.target.value, subcategoryId: '' }))
-                  }
-                  required
-                  className="w-full rounded-lg border border-line bg-[#12111a] px-3 py-2 text-xs text-ink outline-none focus:border-violet/50"
-                >
-                  <option value="">Select Category...</option>
-                  {categoriesList.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-ink-muted">Subcategory (Optional)</label>
-                <select
-                  value={promptForm.subcategoryId}
-                  onChange={(e) => setPromptForm((prev) => ({ ...prev, subcategoryId: e.target.value }))}
-                  disabled={!promptForm.categoryId}
-                  className="w-full rounded-lg border border-line bg-[#12111a] px-3 py-2 text-xs text-ink outline-none focus:border-violet/50 disabled:opacity-40"
-                >
-                  <option value="">Select Subcategory...</option>
-                  {subcategoriesList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="sm:col-span-2 flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-ink-muted">Tags (comma-separated)</label>
-                <input
+                  type="text"
                   value={promptForm.tags}
-                  onChange={(e) => setPromptForm((prev) => ({ ...prev, tags: e.target.value }))}
-                  placeholder="ads, facebook, marketing, copywriting"
-                  className="w-full rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs text-ink placeholder:text-ink-faint outline-none focus:border-violet/50"
+                  onChange={(e) => setPromptForm({ ...promptForm, tags: e.target.value })}
+                  placeholder="marketing, ads, facebook, copywriting"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
                 />
               </div>
 
-              <div className="sm:col-span-2 flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-ink-muted">Summary / Short Description</label>
+              {/* Description */}
+              <div>
+                <label className="block text-ink-muted mb-1 font-medium">Description (Markdown Supported)</label>
                 <textarea
                   rows={2}
                   value={promptForm.description}
-                  onChange={(e) => setPromptForm((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="Brief synopsis for card previews and meta descriptions..."
-                  className="w-full rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs text-ink placeholder:text-ink-faint outline-none focus:border-violet/50"
+                  onChange={(e) => setPromptForm({ ...promptForm, description: e.target.value })}
+                  placeholder="A short overview of what this prompt accomplishes..."
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none leading-relaxed"
                 />
               </div>
 
-              {/* Prompt Body with Live Variable Extraction Tag */}
-              <div className="sm:col-span-2 flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-ink-muted">
-                    Prompt Body * (Use <span className="font-mono text-violet-soft">{`{{VariableName}}`}</span> for inputs)
+              {/* Prompt Template */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-ink-muted font-medium">
+                    Prompt Template * (Use <code className="text-cyan">{'{{variable}}'}</code> for blanks)
                   </label>
-                  {promptForm.prompt && (
-                    <span className="text-[11px] text-cyan font-mono">
-                      {extractVariables(promptForm.prompt).length} variables parsed
-                    </span>
-                  )}
+                  <span className="text-[10px] text-cyan font-mono">
+                    {extractVariables(promptForm.prompt).length} variables detected
+                  </span>
                 </div>
                 <textarea
                   rows={6}
                   required
                   value={promptForm.prompt}
-                  onChange={(e) => setPromptForm((prev) => ({ ...prev, prompt: e.target.value }))}
-                  placeholder="Create a Facebook Ad for {{BusinessName}} targeting {{TargetAudience}} in {{City}}..."
-                  className="w-full rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs font-mono text-ink placeholder:text-ink-faint outline-none focus:border-violet/50 leading-relaxed"
+                  onChange={(e) => setPromptForm({ ...promptForm, prompt: e.target.value })}
+                  placeholder="You are an expert copywriter. Write a Facebook ad for {{BusinessName}} targeting {{Audience}}..."
+                  className="w-full rounded-xl border border-line bg-surface/50 p-3 text-white font-mono text-xs focus:border-violet focus:outline-none leading-relaxed"
                 />
-                {extractVariables(promptForm.prompt).length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-1 p-2 rounded-lg bg-white/[0.02] border border-line/40">
-                    <span className="text-[10px] text-ink-faint self-center">Variables:</span>
-                    {extractVariables(promptForm.prompt).map((v) => (
-                      <span key={v} className="chip !text-[10px] !py-0.5 !border-violet/30 !text-violet-soft">
-                        {v}
-                      </span>
-                    ))}
+              </div>
+
+              {/* MULTI-IMAGE & GOOGLE DRIVE MANAGER */}
+              <div className="rounded-2xl border border-line bg-surface/40 p-4 space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-sm text-white flex items-center gap-2">
+                      <ImageIcon size={15} className="text-cyan" /> Multi-Image Gallery & Media Sources
+                    </h4>
+                    <p style={{ color: '#C8C4E6' }} className="text-[11px] text-ink-muted mt-0.5">
+                      Add images via GitHub upload, Google Drive share links, or direct URLs.
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-mono text-cyan">
+                    {promptForm.images.length} attached
+                  </span>
+                </div>
+
+                {/* Source Tabs */}
+                <div className="flex items-center gap-2 border-b border-line/60 pb-2">
+                  <button
+                    type="button"
+                    onClick={() => setImageSourceTab('github')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      imageSourceTab === 'github'
+                        ? 'bg-violet/20 text-violet-soft border border-violet/40'
+                        : 'text-ink-muted hover:text-white'
+                    }`}
+                  >
+                    GitHub Upload
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageSourceTab('drive')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      imageSourceTab === 'drive'
+                        ? 'bg-violet/20 text-violet-soft border border-violet/40'
+                        : 'text-ink-muted hover:text-white'
+                    }`}
+                  >
+                    Google Drive Link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageSourceTab('url')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      imageSourceTab === 'url'
+                        ? 'bg-violet/20 text-violet-soft border border-violet/40'
+                        : 'text-ink-muted hover:text-white'
+                    }`}
+                  >
+                    Direct Image URL
+                  </button>
+                </div>
+
+                {/* Tab 1: GitHub Upload */}
+                {imageSourceTab === 'github' && (
+                  <div className="space-y-2">
+                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-line/80 hover:border-violet/50 rounded-xl p-4 cursor-pointer bg-white/[0.01] hover:bg-white/[0.03] transition-all">
+                      <CloudUpload size={22} className="text-violet-soft mb-1" />
+                      <span className="text-xs text-white font-medium">Click to upload image to GitHub</span>
+                      <span className="text-[10px] text-ink-faint">PNG, JPG, WebP up to 5MB</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={uploadingImage}
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) handleFileUpload(e.target.files[0])
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                    {uploadingImage && (
+                      <p className="text-[11px] text-violet-soft flex items-center gap-1.5">
+                        <Loader2 size={12} className="animate-spin" /> Uploading to GitHub repo...
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab 2: Google Drive Link */}
+                {imageSourceTab === 'drive' && (
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={driveUrlInput}
+                      onChange={(e) => setDriveUrlInput(e.target.value)}
+                      placeholder="Paste Google Drive share link (e.g. https://drive.google.com/file/d/...)"
+                      className="flex-1 rounded-xl border border-line bg-surface/50 px-3 py-2 text-xs text-white focus:border-violet focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddDriveImage}
+                      className="btn-primary !py-2 !px-3 text-xs"
+                    >
+                      <Plus size={13} /> Add
+                    </button>
+                  </div>
+                )}
+
+                {/* Tab 3: Direct URL */}
+                {imageSourceTab === 'url' && (
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={directUrlInput}
+                      onChange={(e) => setDirectUrlInput(e.target.value)}
+                      placeholder="https://images.unsplash.com/photo-..."
+                      className="flex-1 rounded-xl border border-line bg-surface/50 px-3 py-2 text-xs text-white focus:border-violet focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddDirectImage}
+                      className="btn-primary !py-2 !px-3 text-xs"
+                    >
+                      <Plus size={13} /> Add
+                    </button>
+                  </div>
+                )}
+
+                {uploadError && (
+                  <p className="text-[11px] text-red-400 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
+                    {uploadError}
+                  </p>
+                )}
+
+                {/* Attached Images Grid */}
+                {promptForm.images.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <p className="text-[10px] font-mono uppercase text-ink-faint font-semibold">
+                      Attached Images ({promptForm.images.length})
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      {promptForm.images.map((img, idx) => (
+                        <div
+                          key={idx}
+                          className={`relative rounded-xl overflow-hidden border p-1.5 space-y-1 bg-surface-2 transition-all ${
+                            img.isFeatured ? 'border-violet shadow-glow' : 'border-line'
+                          }`}
+                        >
+                          <img
+                            src={img.imageUrl}
+                            alt=""
+                            className="h-20 w-full object-cover rounded-lg"
+                          />
+                          <div className="flex items-center justify-between text-[10px] pt-1">
+                            <span className="chip !py-0 !px-1.5 !text-[9px] uppercase">
+                              {img.source || 'direct'}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleSetFeaturedImage(idx)}
+                                className={`p-1 rounded ${
+                                  img.isFeatured ? 'text-amber' : 'text-ink-faint hover:text-white'
+                                }`}
+                                title={img.isFeatured ? 'Featured Cover Image' : 'Set as Featured Cover'}
+                              >
+                                <Star size={12} className={img.isFeatured ? 'fill-amber' : ''} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveImage(idx)}
+                                className="p-1 rounded text-ink-faint hover:text-red-400"
+                                title="Remove image"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Image Dropzones */}
-              <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
-                <UploadDropzone
-                  label="Featured Card Image"
-                  value={promptForm.featuredImage}
-                  uploading={uploadingFeatured}
-                  onFileSelected={handleFeaturedUpload}
-                  onUrlChange={(url) => setPromptForm((prev) => ({ ...prev, featuredImage: url }))}
-                />
-                <UploadDropzone
-                  label="Example Output Image"
-                  value={promptForm.outputImage}
-                  uploading={uploadingOutput}
-                  onFileSelected={handleOutputUpload}
-                  onUrlChange={(url) => setPromptForm((prev) => ({ ...prev, outputImage: url }))}
-                />
-              </div>
+              {/* Super Admin Status Toggle */}
+              {isSuperAdmin && (
+                <div className="flex items-center gap-4 pt-2 border-t border-line/60">
+                  <label className="text-ink-muted font-medium">Publish Status:</label>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="status"
+                        value="published"
+                        checked={promptForm.status === 'published'}
+                        onChange={() => setPromptForm({ ...promptForm, status: 'published' })}
+                      />
+                      <span>Published (Live)</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="status"
+                        value="draft"
+                        checked={promptForm.status === 'draft'}
+                        onChange={() => setPromptForm({ ...promptForm, status: 'draft' })}
+                      />
+                      <span>Draft</span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-ink-muted">SEO Title</label>
-                <input
-                  value={promptForm.seoTitle}
-                  onChange={(e) => setPromptForm((prev) => ({ ...prev, seoTitle: e.target.value }))}
-                  placeholder="Facebook Ad Copy Prompt"
-                  className="w-full rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs text-ink placeholder:text-ink-faint outline-none focus:border-violet/50"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-ink-muted">SEO Description</label>
-                <input
-                  value={promptForm.seoDescription}
-                  onChange={(e) => setPromptForm((prev) => ({ ...prev, seoDescription: e.target.value }))}
-                  placeholder="Generate high-converting Facebook ad copy in seconds..."
-                  className="w-full rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs text-ink placeholder:text-ink-faint outline-none focus:border-violet/50"
-                />
-              </div>
-
-              {/* Toggles */}
-              <div className="sm:col-span-2 flex flex-wrap gap-4 pt-2 border-t border-line/60">
-                <CheckboxToggle
-                  label="Featured"
-                  checked={promptForm.featured}
-                  onChange={(checked) => setPromptForm((prev) => ({ ...prev, featured: checked }))}
-                />
-                <CheckboxToggle
-                  label="Popular"
-                  checked={promptForm.popular}
-                  onChange={(checked) => setPromptForm((prev) => ({ ...prev, popular: checked }))}
-                />
-                <CheckboxToggle
-                  label="Trending"
-                  checked={promptForm.trending}
-                  onChange={(checked) => setPromptForm((prev) => ({ ...prev, trending: checked }))}
-                />
-                <CheckboxToggle
-                  label="Publish Immediately"
-                  checked={promptForm.status === 'published'}
-                  onChange={(checked) =>
-                    setPromptForm((prev) => ({ ...prev, status: checked ? 'published' : 'draft' }))
-                  }
-                />
-              </div>
-
-              {/* Form Buttons */}
-              <div className="sm:col-span-2 flex justify-end gap-3 pt-4 border-t border-line/60">
+              {/* Submit Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-line">
                 <button
                   type="button"
                   onClick={() => setShowPromptModal(false)}
-                  className="btn-ghost !px-4 !py-2 text-xs"
+                  className="btn-ghost !py-2 text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingPrompt}
-                  className="btn-primary !px-5 !py-2 text-xs shadow-glow"
+                  className="btn-primary !py-2 !px-5 text-xs shadow-glow"
                 >
                   {submittingPrompt ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 size={14} className="animate-spin" /> Saving Prompt...
-                    </span>
+                    <Loader2 size={14} className="animate-spin" />
                   ) : editingPromptId ? (
-                    'Update Prompt'
+                    isCategoryAdmin ? 'Update & Resubmit for Review' : 'Save Changes'
+                  ) : isCategoryAdmin ? (
+                    'Submit for Review'
                   ) : (
                     'Publish Prompt'
                   )}
@@ -1721,89 +2036,231 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ======================= MODAL: ADD / EDIT CATEGORY ======================= */}
-      {showCatModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-md p-4 sm:p-6 relative animate-fadeIn border-violet/30 shadow-glow max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-line pb-3 mb-4 sm:mb-5">
-              <div className="flex items-center gap-2">
-                <FolderKanban size={18} className="text-violet-soft" />
-                <h3 className="font-display font-semibold text-sm sm:text-base text-ink">
-                  {editingCatId ? 'Edit Category' : 'Create New Category'}
-                </h3>
-              </div>
+      {/* ------------------------------------------------------------------ */}
+      {/* MODAL 2: REJECT WITH FEEDBACK (Super Admin)                       */}
+      {/* ------------------------------------------------------------------ */}
+      {rejectModal.show && isSuperAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="glass-card w-full max-w-md p-6 space-y-4 border-red-500/30">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-base text-white flex items-center gap-2">
+                <XCircle size={18} className="text-red-400" /> Reject Prompt Submission
+              </h3>
               <button
-                onClick={() => setShowCatModal(false)}
-                className="text-ink-muted hover:text-white"
+                onClick={() => setRejectModal({ show: false, promptId: null, promptTitle: '', reason: '' })}
+                className="p-1 text-ink-muted hover:text-white"
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveCategory} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-ink-muted">Category Name *</label>
+            <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted leading-relaxed">
+              Rejecting <strong className="text-white">"{rejectModal.promptTitle}"</strong>. Provide optional feedback so the Category Admin can correct and resubmit.
+            </p>
+
+            <form onSubmit={handleConfirmReject} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-ink-muted mb-1">Rejection Reason / Feedback</label>
+                <textarea
+                  rows={3}
+                  value={rejectModal.reason}
+                  onChange={(e) => setRejectModal({ ...rejectModal, reason: e.target.value })}
+                  placeholder="e.g. Please refine the variables and ensure prompt instructions are more detailed..."
+                  className="w-full rounded-xl border border-line bg-surface/50 p-3 text-white focus:border-red-400 focus:outline-none leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRejectModal({ show: false, promptId: null, promptTitle: '', reason: '' })}
+                  className="btn-ghost !py-2 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={rejectingLoading}
+                  className="btn-primary !py-2 !px-4 text-xs bg-red-500 hover:bg-red-600 text-white"
+                >
+                  {rejectingLoading ? <Loader2 size={13} className="animate-spin" /> : 'Confirm Reject'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* MODAL 3: CREATE / INVITE ADMIN (Super Admin)                      */}
+      {/* ------------------------------------------------------------------ */}
+      {adminModal.show && isSuperAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="glass-card w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-base text-white flex items-center gap-2">
+                <Users size={18} className="text-cyan" /> Invite / Create Admin User
+              </h3>
+              <button
+                onClick={() => setAdminModal({ ...adminModal, show: false })}
+                className="p-1 text-ink-muted hover:text-white"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAdmin} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-ink-muted mb-1 font-medium">Display Name</label>
+                <input
+                  type="text"
+                  value={adminModal.displayName}
+                  onChange={(e) => setAdminModal({ ...adminModal, displayName: e.target.value })}
+                  placeholder="e.g. Amna Shakeel"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-ink-muted mb-1 font-medium">Email Address *</label>
+                <input
+                  type="email"
+                  required
+                  value={adminModal.email}
+                  onChange={(e) => setAdminModal({ ...adminModal, email: e.target.value })}
+                  placeholder="admin@example.com"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-ink-muted mb-1 font-medium">Password (min 6 characters) *</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={adminModal.password}
+                  onChange={(e) => setAdminModal({ ...adminModal, password: e.target.value })}
+                  placeholder="••••••••"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-ink-muted mb-1 font-medium">Role *</label>
+                <select
+                  value={adminModal.role}
+                  onChange={(e) => setAdminModal({ ...adminModal, role: e.target.value })}
+                  aria-label="Select admin role"
+                  className="w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                >
+                  <option value="category_admin">Category Admin (Scoped Access + Approvals)</option>
+                  <option value="super_admin">Super Admin (Full Unrestricted Access)</option>
+                </select>
+              </div>
+
+              {adminModal.role === 'category_admin' && (
+                <div>
+                  <label className="block text-ink-muted mb-1 font-medium">Assigned Category *</label>
+                  <select
+                    required
+                    value={adminModal.assignedCategoryId}
+                    onChange={(e) => setAdminModal({ ...adminModal, assignedCategoryId: e.target.value })}
+                    aria-label="Select assigned category for admin"
+                    className="w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                  >
+                    <option value="">Select a category...</option>
+                    {categoriesList.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-line">
+                <button
+                  type="button"
+                  onClick={() => setAdminModal({ ...adminModal, show: false })}
+                  className="btn-ghost !py-2 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingAdmin}
+                  className="btn-primary !py-2 !px-4 text-xs shadow-glow"
+                >
+                  {submittingAdmin ? <Loader2 size={13} className="animate-spin" /> : 'Create Admin'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* MODAL 4: CATEGORY FORM (Super Admin)                              */}
+      {/* ------------------------------------------------------------------ */}
+      {showCatModal && isSuperAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="glass-card w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-base text-white">
+                {editingCatId ? 'Edit Category' : 'New Category'}
+              </h3>
+              <button
+                onClick={() => setShowCatModal(false)}
+                className="p-1 text-ink-muted hover:text-white"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCategory} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-ink-muted mb-1 font-medium">Category Name *</label>
                 <input
                   type="text"
                   required
                   value={catForm.name}
-                  onChange={(e) => handleCatNameChange(e.target.value)}
+                  onChange={(e) => {
+                    const name = e.target.value
+                    const slug = name.toLowerCase().trim().replace(/[\s_-]+/g, '-')
+                    setCatForm({ ...catForm, name, slug: editingCatId ? catForm.slug : slug })
+                  }}
                   placeholder="e.g. Artificial Intelligence"
-                  className="w-full rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs text-ink placeholder:text-ink-faint outline-none focus:border-violet/50"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-ink-muted">Category Slug *</label>
+              <div>
+                <label className="block text-ink-muted mb-1 font-medium">Slug *</label>
                 <input
                   type="text"
                   required
                   value={catForm.slug}
-                  onChange={(e) => setCatForm((prev) => ({ ...prev, slug: e.target.value }))}
+                  onChange={(e) => setCatForm({ ...catForm, slug: e.target.value })}
                   placeholder="artificial-intelligence"
-                  className="w-full rounded-lg border border-line bg-white/[0.03] px-3.5 py-2 text-xs text-ink placeholder:text-ink-faint outline-none focus:border-violet/50 font-mono"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white font-mono focus:border-violet focus:outline-none"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-ink-muted">Choose Icon</label>
-                <div className="grid grid-cols-4 gap-2 max-h-36 overflow-y-auto p-1 border border-line/40 rounded-lg">
-                  {AVAILABLE_ICONS.map((item) => {
-                    const IconComp = item.icon
-                    const isSelected = catForm.icon === item.name
-                    return (
-                      <button
-                        type="button"
-                        key={item.name}
-                        onClick={() => setCatForm((prev) => ({ ...prev, icon: item.name }))}
-                        className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-xs transition-all ${
-                          isSelected
-                            ? 'border-violet-soft bg-violet/20 text-white'
-                            : 'border-line/40 text-ink-muted hover:text-white hover:bg-white/[0.02]'
-                        }`}
-                      >
-                        <IconComp size={16} />
-                        <span className="text-[10px] truncate max-w-full">{item.name}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-line/60">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-line">
                 <button
                   type="button"
                   onClick={() => setShowCatModal(false)}
-                  className="btn-ghost !px-3.5 !py-2 text-xs"
+                  className="btn-ghost !py-2 text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingCat}
-                  className="btn-primary !px-4 !py-2 text-xs"
+                  className="btn-primary !py-2 !px-4 text-xs shadow-glow"
                 >
-                  {submittingCat ? 'Saving...' : editingCatId ? 'Update' : 'Create'}
+                  {submittingCat ? <Loader2 size={13} className="animate-spin" /> : 'Save Category'}
                 </button>
               </div>
             </form>
@@ -1814,24 +2271,26 @@ export default function AdminDashboard() {
   )
 }
 
-function SidebarLink({ active, onClick, icon: Icon, label, badge }) {
+function SidebarLink({ active, onClick, icon: Icon, label, badge, badgeColor = 'cyan' }) {
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium transition-all ${
+      className={`flex items-center justify-between w-full rounded-xl px-3 py-2 text-xs font-medium transition-all ${
         active
-          ? 'bg-violet/15 text-violet-soft border border-violet/30 shadow-glow'
+          ? 'bg-violet/15 text-white border border-violet/30 shadow-glow'
           : 'text-ink-muted hover:bg-white/[0.04] hover:text-white'
       }`}
     >
       <div className="flex items-center gap-2.5">
-        <Icon size={16} className={active ? 'text-violet-soft' : 'text-ink-faint'} />
+        <Icon size={15} className={active ? 'text-violet-soft' : 'text-ink-faint'} />
         <span>{label}</span>
       </div>
-      {badge !== undefined && (
+      {badge !== undefined && badge !== 0 && (
         <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-mono ${
-            active ? 'bg-violet/30 text-white' : 'bg-white/[0.06] text-ink-faint'
+          className={`chip !py-0.5 !px-1.5 !text-[10px] font-mono ${
+            badgeColor === 'amber'
+              ? '!border-amber/40 !bg-amber/20 !text-amber font-semibold animate-pulse'
+              : '!border-line !bg-surface !text-cyan'
           }`}
         >
           {badge}
@@ -1841,77 +2300,31 @@ function SidebarLink({ active, onClick, icon: Icon, label, badge }) {
   )
 }
 
-function StatCard({ title, value, sublabel, icon: Icon, gradient }) {
+function StatCard({ title, value, icon: Icon, change, highlight = false }) {
   return (
-    <div className={`glass-card p-5 relative overflow-hidden bg-gradient-to-br ${gradient} border-line hover:border-violet/30 transition-all`}>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-ink-muted">{title}</span>
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/[0.05] border border-line text-ink">
-          <Icon size={16} />
+    <div
+      className={`glass-card p-4 sm:p-5 flex flex-col justify-between transition-all ${
+        highlight ? 'border-amber/40 bg-amber/[0.04]' : ''
+      }`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] sm:text-xs font-medium text-ink-muted">{title}</span>
+        <span
+          className={`grid h-8 w-8 place-items-center rounded-xl border ${
+            highlight
+              ? 'bg-amber/15 border-amber/30 text-amber'
+              : 'bg-white/[0.02] border-line text-violet-soft'
+          }`}
+        >
+          <Icon size={15} />
         </span>
       </div>
-      <p className="mt-3 font-display text-2xl font-semibold text-ink tracking-tight">{value}</p>
-      <p className="mt-1 text-[11px] text-ink-faint">{sublabel}</p>
-    </div>
-  )
-}
-
-function UploadDropzone({ label, value, uploading, onFileSelected, onUrlChange }) {
-  const fileInputRef = useRef(null)
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-medium text-ink-muted">{label}</label>
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept="image/*"
-        onChange={(e) => {
-          if (e.target.files?.[0]) onFileSelected(e.target.files[0])
-        }}
-        className="hidden"
-      />
-      <div
-        onClick={() => !uploading && fileInputRef.current?.click()}
-        className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-line bg-white/[0.02] px-4 py-3.5 text-xs text-ink-faint cursor-pointer hover:border-violet/40 hover:text-ink-muted transition-colors"
-      >
-        {uploading ? (
-          <span className="flex items-center gap-2 text-violet-soft">
-            <Loader2 size={15} className="animate-spin" /> Uploading to GitHub repo...
-          </span>
-        ) : (
-          <span className="flex items-center gap-2">
-            <CloudUpload size={15} /> Upload via GitHub
-          </span>
-        )}
+      <div>
+        <p className={`font-display text-xl sm:text-2xl font-bold ${highlight ? 'text-amber' : 'text-white'}`}>
+          {value}
+        </p>
+        {change && <p className="text-[10px] sm:text-[11px] text-ink-faint mt-0.5">{change}</p>}
       </div>
-      <input
-        type="url"
-        value={value || ''}
-        onChange={(e) => onUrlChange(e.target.value)}
-        placeholder="Or paste direct image URL (https://...)"
-        className="w-full rounded-lg border border-line bg-white/[0.03] px-3 py-1.5 text-[11px] text-ink placeholder:text-ink-faint outline-none focus:border-violet/50"
-      />
-      {value && (
-        <div className="mt-1 flex items-center gap-2 text-xs text-ink-faint truncate">
-          <Check size={12} className="text-cyan shrink-0" />
-          <span className="truncate text-[10px] text-cyan font-mono">{value}</span>
-        </div>
-      )}
     </div>
-  )
-}
-
-function CheckboxToggle({ label, checked, onChange }) {
-  return (
-    <label className="flex items-center gap-2 text-xs text-ink-muted cursor-pointer hover:text-white transition-colors">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-line accent-violet cursor-pointer"
-      />
-      <span>{label}</span>
-    </label>
   )
 }
