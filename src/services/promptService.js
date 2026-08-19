@@ -402,42 +402,52 @@ export async function incrementPromptCopies(promptId) {
  * Admin: Get all prompts (scoped by category if category_admin).
  */
 export async function getAdminPrompts(userProfile = null) {
-  let query = supabase
-    .from('prompts')
-    .select('*, categories(name), subcategories(name), prompt_images(*)')
-    .order('created_at', { ascending: false })
+  try {
+    let query = supabase
+      .from('prompts')
+      .select('*')
+      .order('created_at', { ascending: false })
 
-  // Scope to category if user is a category admin
-  if (userProfile && userProfile.role === 'category_admin' && userProfile.assigned_category_id) {
-    query = query.eq('category_id', userProfile.assigned_category_id)
+    // Scope to category if user is a category admin
+    if (userProfile && userProfile.role === 'category_admin' && userProfile.assigned_category_id) {
+      query = query.eq('category_id', userProfile.assigned_category_id)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching admin prompts:', error)
+      return []
+    }
+
+    return (data || []).map(formatPrompt)
+  } catch (err) {
+    console.error('Error in getAdminPrompts:', err)
+    return []
   }
-
-  const { data, error } = await query
-
-  if (error) {
-    console.error('Error fetching admin prompts:', error)
-    throw error
-  }
-
-  return (data || []).map(formatPrompt)
 }
 
 /**
  * Super Admin: Get all pending prompts awaiting review.
  */
 export async function getPendingPrompts() {
-  const { data, error } = await supabase
-    .from('prompts')
-    .select('*, categories(name), subcategories(name), prompt_images(*)')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false })
+  try {
+    const { data, error } = await supabase
+      .from('prompts')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('Error fetching pending prompts:', error)
-    throw error
+    if (error) {
+      console.warn('Error fetching pending prompts:', error.message)
+      return []
+    }
+
+    return (data || []).map(formatPrompt)
+  } catch (err) {
+    console.warn('Error in getPendingPrompts:', err)
+    return []
   }
-
-  return (data || []).map(formatPrompt)
 }
 
 /**
@@ -742,17 +752,22 @@ export async function savePromptImages(promptId, images = []) {
  * Super Admin: Get all admin profiles.
  */
 export async function getAdminProfiles() {
-  const { data, error } = await supabase
-    .from('admin_profiles')
-    .select('*, categories(id, name, slug)')
-    .order('created_at', { ascending: false })
+  try {
+    const { data, error } = await supabase
+      .from('admin_profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('Error fetching admin profiles:', error)
-    throw error
+    if (error) {
+      console.warn('Could not fetch admin profiles (table might be empty or migrating):', error.message)
+      return []
+    }
+
+    return (data || []).map(formatAdminProfile)
+  } catch (err) {
+    console.warn('Error fetching admin profiles:', err)
+    return []
   }
-
-  return (data || []).map(formatAdminProfile)
 }
 
 /**

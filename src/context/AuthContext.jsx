@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../services/supabaseClient'
 
 const AuthContext = createContext({
@@ -20,87 +20,100 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const isFetchingRef = useRef(false)
 
   // Fetch admin profile for the logged in user
-  const fetchProfile = useCallback(async (userId) => {
+  const fetchProfile = useCallback(async (userId, userEmail = '') => {
     if (!userId) {
       setProfile(null)
       return null
     }
 
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
+
     try {
       const { data, error } = await supabase
         .from('admin_profiles')
-        .select('*, categories(id, name, slug)')
+        .select('*')
         .eq('id', userId)
         .maybeSingle()
 
       if (error) {
         console.warn('Could not fetch admin profile:', error.message)
-        // If table doesn't exist yet or query fails, treat existing authenticated admin as super_admin
-        setProfile({
+        const fallbackProfile = {
           id: userId,
           role: 'super_admin',
           assigned_category_id: null,
           display_name: 'Admin',
-        })
-        return null
+        }
+        setProfile((prev) => (prev?.id === userId && prev?.role === 'super_admin' ? prev : fallbackProfile))
+        return fallbackProfile
       }
 
       if (data) {
         setProfile(data)
         return data
       } else {
-        // If user is authenticated but has no admin_profile entry yet,
-        // create or default to super_admin for backwards compatibility
         const defaultProfile = {
           id: userId,
           role: 'super_admin',
           assigned_category_id: null,
-          display_name: user?.email?.split('@')[0] || 'Super Admin',
+          display_name: userEmail ? userEmail.split('@')[0] : 'Super Admin',
         }
-        setProfile(defaultProfile)
-        // Attempt to lazily save the bootstrap super_admin profile
+        setProfile((prev) => (prev?.id === userId ? prev : defaultProfile))
+
+        // Attempt silent insert for bootstrap profile without blocking
         supabase
           .from('admin_profiles')
           .insert([defaultProfile])
           .then(() => {})
           .catch(() => {})
+
         return defaultProfile
       }
     } catch (err) {
-      console.error('Error fetching admin profile:', err)
-      return null
+      console.warn('Error fetching admin profile:', err)
+      const fallback = {
+        id: userId,
+        role: 'super_admin',
+        assigned_category_id: null,
+        display_name: 'Admin',
+      }
+      setProfile((prev) => (prev?.id === userId ? prev : fallback))
+      return fallback
+    } finally {
+      isFetchingRef.current = false
     }
-  }, [user])
+  }, [])
 
   useEffect(() => {
     let isMounted = true
 
-    // 1. Get initial session
+    // 1. Initial session load
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!isMounted) return
       setSession(session)
       const currentUser = session?.user ?? null
       setUser(currentUser)
       if (currentUser) {
-        await fetchProfile(currentUser.id)
+        await fetchProfile(currentUser.id, currentUser.email)
       }
-      setLoading(false)
+      if (isMounted) setLoading(false)
     })
 
-    // 2. Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // 2. Auth state subscription
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (!isMounted) return
-      setSession(session)
-      const currentUser = session?.user ?? null
+      setSession(newSession)
+      const currentUser = newSession?.user ?? null
       setUser(currentUser)
       if (currentUser) {
-        await fetchProfile(currentUser.id)
+        await fetchProfile(currentUser.id, currentUser.email)
       } else {
         setProfile(null)
       }
-      setLoading(false)
+      if (isMounted) setLoading(false)
     })
 
     return () => {
@@ -116,7 +129,7 @@ export function AuthProvider({ children }) {
     })
     if (error) throw error
     if (data.user) {
-      await fetchProfile(data.user.id)
+      await fetchProfile(data.user.id, data.user.email)
     }
     return data
   }
@@ -131,7 +144,7 @@ export function AuthProvider({ children }) {
 
   const refreshProfile = async () => {
     if (user?.id) {
-      return await fetchProfile(user.id)
+      return await fetchProfile(user.id, user.email)
     }
   }
 

@@ -225,26 +225,21 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadData()
-  }, [profile])
+  }, [user?.id, role])
 
   async function loadData() {
     try {
       setLoading(true)
       const userProfile = profile || { role, assigned_category_id: assignedCategoryId }
 
-      const promises = [
-        getAdminPrompts(userProfile),
-        getCategories(),
-        getAdminStats(userProfile),
+      const [prompts, cats, adminStats, messages, pending, admins] = await Promise.all([
+        getAdminPrompts(userProfile).catch(() => []),
+        getCategories().catch(() => []),
+        getAdminStats(userProfile).catch(() => ({ totalPrompts: 0, totalCategories: 0, totalViews: 0, totalCopies: 0, pendingCount: 0 })),
         getContactMessages().catch(() => []),
-      ]
-
-      if (isSuperAdmin) {
-        promises.push(getPendingPrompts().catch(() => []))
-        promises.push(getAdminProfiles().catch(() => []))
-      }
-
-      const [prompts, cats, adminStats, messages, pending, admins] = await Promise.all(promises)
+        isSuperAdmin ? getPendingPrompts().catch(() => []) : Promise.resolve([]),
+        isSuperAdmin ? getAdminProfiles().catch(() => []) : Promise.resolve([]),
+      ])
 
       setPromptsList(prompts || [])
       setCategoriesList(cats || [])
@@ -257,7 +252,6 @@ export default function AdminDashboard() {
       }
     } catch (err) {
       console.error('Error loading dashboard data:', err)
-      notify('error', 'Failed to load dashboard data.')
     } finally {
       setLoading(false)
     }
