@@ -386,8 +386,8 @@ INSERT INTO public.categories (id, name, slug, icon) VALUES
 ('c4', 'Business', 'business', 'Briefcase'),
 ('c5', 'Social Media', 'social-media', 'Share2'),
 ('c6', 'Design', 'design', 'Palette')
-ON CONFLICT (id) DO UPDATE 
-SET name = EXCLUDED.name, slug = EXCLUDED.slug, icon = EXCLUDED.icon;
+ON CONFLICT (slug) DO UPDATE 
+SET name = EXCLUDED.name, icon = EXCLUDED.icon;
 
 INSERT INTO public.subcategories (id, category_id, name, slug) VALUES
 ('s1', 'c1', 'Ad Copy', 'ad-copy'),
@@ -395,8 +395,7 @@ INSERT INTO public.subcategories (id, category_id, name, slug) VALUES
 ('s3', 'c3', 'Code Review', 'code-review'),
 ('s4', 'c3', 'Debugging', 'debugging'),
 ('s5', 'c5', 'Captions', 'captions')
-ON CONFLICT (id) DO UPDATE 
-SET category_id = EXCLUDED.category_id, name = EXCLUDED.name, slug = EXCLUDED.slug;
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.prompts (
     id, title, slug, category_id, subcategory_id, description,
@@ -536,17 +535,23 @@ INSERT INTO public.prompts (
     'Instagram Caption Generator Prompt | PromptVault',
     'Generate engaging, on-brand Instagram captions with hooks and hashtags.'
 )
-ON CONFLICT (id) DO UPDATE 
-SET title = EXCLUDED.title, slug = EXCLUDED.slug, prompt = EXCLUDED.prompt, status = EXCLUDED.status;
+ON CONFLICT (slug) DO UPDATE 
+SET title = EXCLUDED.title, prompt = EXCLUDED.prompt, status = EXCLUDED.status;
 
 -- Also seed prompt_images for starter prompts
 INSERT INTO public.prompt_images (id, prompt_id, image_url, source, sort_order, is_featured)
-VALUES
-('img-p1-1', 'p1', 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?q=80&w=1200&auto=format&fit=crop', 'direct', 0, TRUE),
-('img-p1-2', 'p1', 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1200&auto=format&fit=crop', 'direct', 1, FALSE),
-('img-p2-1', 'p2', 'https://images.unsplash.com/photo-1557200134-90327ee9fafa?q=80&w=1200&auto=format&fit=crop', 'direct', 0, TRUE),
-('img-p3-1', 'p3', 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=1200&auto=format&fit=crop', 'direct', 0, TRUE),
-('img-p4-1', 'p4', 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=1200&auto=format&fit=crop', 'direct', 0, TRUE),
-('img-p5-1', 'p5', 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=80&w=1200&auto=format&fit=crop', 'direct', 0, TRUE),
-('img-p6-1', 'p6', 'https://images.unsplash.com/photo-1611262588024-d12430b98920?q=80&w=1200&auto=format&fit=crop', 'direct', 0, TRUE)
+SELECT 'img-p1-1', id, 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?q=80&w=1200&auto=format&fit=crop', 'direct', 0, TRUE FROM public.prompts WHERE slug = 'high-converting-facebook-ad-copy'
+UNION ALL
+SELECT 'img-p1-2', id, 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1200&auto=format&fit=crop', 'direct', 1, FALSE FROM public.prompts WHERE slug = 'high-converting-facebook-ad-copy'
+UNION ALL
+SELECT 'img-p2-1', id, 'https://images.unsplash.com/photo-1557200134-90327ee9fafa?q=80&w=1200&auto=format&fit=crop', 'direct', 0, TRUE FROM public.prompts WHERE slug = 'cold-outreach-email-that-gets-replies'
+UNION ALL
+SELECT 'img-p3-1', id, 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=1200&auto=format&fit=crop', 'direct', 0, TRUE FROM public.prompts WHERE slug = 'senior-level-code-review-checklist'
+UNION ALL
+SELECT 'img-p4-1', id, 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=1200&auto=format&fit=crop', 'direct', 0, TRUE FROM public.prompts WHERE slug = 'debug-any-stack-trace'
+UNION ALL
+SELECT 'img-p5-1', id, 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=80&w=1200&auto=format&fit=crop', 'direct', 0, TRUE FROM public.prompts WHERE slug = 'startup-pitch-deck-narrative'
+UNION ALL
+SELECT 'img-p6-1', id, 'https://images.unsplash.com/photo-1611262588024-d12430b98920?q=80&w=1200&auto=format&fit=crop', 'direct', 0, TRUE FROM public.prompts WHERE slug = 'instagram-caption-generator'
 ON CONFLICT (id) DO NOTHING;
+
