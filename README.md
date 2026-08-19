@@ -1,153 +1,234 @@
-# PromptVault
+# ⚡ PromptVault — Ready-to-Run AI Prompt Library & Dynamic Generator
 
-A production-ready, full-stack AI Prompt Library built with React (Vite + Tailwind CSS + Framer Motion), powered by Supabase (PostgreSQL, Row Level Security, Admin Auth, and RPC stored procedures) and secured serverless GitHub image uploads.
+<div align="center">
 
----
+[![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+[![Vercel](https://img.shields.io/badge/Vercel-Deployed-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-violet.svg?style=for-the-badge)](LICENSE)
 
-## Features
+<p align="center">
+  <b>A modern, full-stack prompt engineering library and variable injection engine built for creators, marketers, and developers.</b>
+</p>
 
-- **Production-Ready Backend**: Powered by Supabase for categories, subcategories, and prompt storage.
-- **Row Level Security (RLS)**: Public read access for published prompts; full authenticated CRUD for admins.
-- **Atomic Counters**: PostgreSQL RPC stored procedures for incrementing views and copies reliably.
-- **Admin Dashboard & Auth**: Full prompt lifecycle management (Create, Read, Update, Delete, Publish/Draft status toggle) protected by Supabase Auth and route guards.
-- **Secure Image Uploads**: Serverless Vercel function (`api/upload-image.js`) that uploads prompt images to a GitHub repository using a server-side `GITHUB_TOKEN` without exposing credentials to the client.
-- **Dynamic Variable Detection**: Automatically parses `{{VariableName}}` placeholders from prompt text and builds interactive fill-in forms.
-- **SEO & Social Sharing**: Complete OpenGraph, Twitter Cards, canonical tags, JSON-LD Schema (`TechArticle` / `WebSite`), and a dynamic `sitemap.xml` serverless endpoint.
-- **High Performance**: Lazy-loaded routes with `React.lazy` + `Suspense`, image aspect ratios to eliminate CLS, and paginated range queries.
+[**🌐 Explore Live Application**](https://prompt-vault.vercel.app) · [**✨ Report an Issue**](https://github.com/amnashakeel487/prompt_vault/issues) · [**💬 Contact Team**](https://prompt-vault.vercel.app/contact)
 
----
-
-## 1. Supabase Database & Auth Setup
-
-### Step 1: Create a Supabase Project
-1. Go to [supabase.com](https://supabase.com) and create a new project.
-2. Note your **Project URL** and **anon public key** under **Project Settings → API**.
-
-### Step 2: Run SQL Schema & Seed Data
-1. In the Supabase Dashboard, open the **SQL Editor**.
-2. Copy and paste the contents of [`supabase/schema.sql`](./supabase/schema.sql).
-3. Click **Run**.
-   - This creates the `categories`, `subcategories`, and `prompts` tables.
-   - Sets up Row Level Security (RLS) policies.
-   - Creates the `increment_views` and `increment_copies` RPC functions.
-   - Adds performance indexes.
-   - Inserts initial seed categories and prompts.
-
-### Step 3: Create an Admin User
-1. In the Supabase Dashboard, go to **Authentication → Users**.
-2. Click **Add User → Create user**.
-3. Enter your admin email and a secure password, and toggle **Auto Confirm User?** on.
-4. Use these credentials to sign in at `/admin/login`.
+</div>
 
 ---
 
-## 2. GitHub Image Repository & Token Setup
+## 📖 Overview
 
-Images uploaded through the admin dashboard are stored directly in a GitHub repository as raw assets and served via GitHub CDN.
+**PromptVault** is a production-grade AI prompt library web application that solves the friction of generic AI prompting. Instead of copy-pasting raw text and manually finding placeholders, PromptVault scans prompt bodies in real-time, extracts all `{{Variable}}` tokens, automatically renders dynamic interactive form fields, and swaps in user values instantly with one-click copy and live token count estimation.
 
-1. **Create or select a GitHub repository** (e.g., `my-username/prompt-vault-assets` or the current repository).
-2. **Generate a GitHub Personal Access Token**:
-   - Go to [GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)](https://github.com/settings/tokens).
-   - Click **Generate new token (classic)**.
-   - Note: Give it a description like `PromptVault Asset Uploader` and select the **`repo`** scope (or Fine-grained token with `Contents: Read and write`).
-   - Copy the generated token (`ghp_...` or `github_pat_...`).
+Powered by a **Supabase PostgreSQL** backend, **Vercel Serverless Functions**, and a **Tailwind CSS + Framer Motion** dark glassmorphic design system, PromptVault is 100% responsive and production-ready.
 
 ---
 
-## 3. Environment Variables Setup
+## ✨ Key Features
 
-Create a `.env` file in the project root based on `.env.example`:
+- ⚡ **Dynamic Variable Engine**: Automatically detects `{{Variable}}` tags in prompt text and dynamically constructs form inputs without manual coding.
+- 🎯 **Real-time Live Preview**: View prompt substitutions in real-time with syntax highlighting and token count estimation.
+- 🎨 **Dark Glassmorphism Interface**: Styled with custom violet/cyan glow aesthetics, responsive typography, and an interactive typewriter terminal.
+- 🗄️ **Supabase Cloud Backend**: Connected to real PostgreSQL tables (`prompts`, `categories`, `subcategories`, `contact_messages`) with secure Row Level Security (RLS).
+- 📊 **Real-time Metric Tracking**: Atomic database RPC functions (`increment_views`, `increment_copies`) for live impression and copy tracking.
+- 🔐 **Comprehensive Admin Dashboard**:
+  - **Prompts Library**: Full CRUD operations with rich metadata, tag taxonomies, and live/draft toggles.
+  - **Taxonomy Manager**: Manage categories, auto-generated slugs, and subcategory tags.
+  - **Contact Inbox**: Read, reply via email, mark as read, and delete visitor inquiries.
+  - **Vault Analytics**: View conversion rates, top performing prompts, and impressions.
+  - **Profile & Security**: Update admin credentials and manage sessions.
+- ☁️ **Vercel Serverless Functions**:
+  - `/api/upload-image`: Server-side GitHub REST API integration for secure image uploads without exposing client tokens.
+  - `/api/sitemap`: Dynamic XML sitemap generated on-the-fly from live Supabase records for search engine indexing.
+- 📱 **100% Mobile Responsive**: Audited and optimized across 375px (mobile), 768px (tablet), and desktop displays with 44px+ accessible touch targets.
 
+---
+
+## 🛠️ Tech Stack
+
+### **Frontend**
+- **Core**: [React 18](https://react.js.org/) + [Vite](https://vitejs.dev/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) + `@tailwindcss/typography`
+- **Animations**: [Framer Motion](https://www.framer.com/motion/)
+- **Routing**: [React Router v6](https://reactrouter.com/)
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **Forms**: [React Hook Form](https://react-hook-form.com/)
+- **Markdown**: [React Markdown](https://github.com/remarkjs/react-markdown)
+
+### **Backend & Storage**
+- **Database & Auth**: [Supabase](https://supabase.com/) (PostgreSQL with RLS & Stored Procedures)
+- **Serverless API**: [Vercel Serverless Functions](https://vercel.com/docs/functions) (Node.js)
+- **Image Storage**: GitHub Content Storage via Authenticated REST API
+
+---
+
+## 📂 Project Structure
+
+```text
+prompt_vault/
+├── api/                          # Vercel Serverless Functions
+│   ├── sitemap.js                # Dynamic XML sitemap generator
+│   └── upload-image.js           # Secure server-side GitHub image upload endpoint
+├── public/                       # Static public assets & robots.txt
+├── src/
+│   ├── components/               # Reusable UI components
+│   │   ├── CategoryCard.jsx      # Interactive category card
+│   │   ├── CopyButton.jsx        # One-click copy with visual feedback
+│   │   ├── EmptyState.jsx        # Empty state display component
+│   │   ├── FAQ.jsx               # Expandable accordion FAQ
+│   │   ├── Footer.jsx            # Multi-column footer with credits
+│   │   ├── HeroTerminal.jsx      # Animated interactive typewriter hero terminal
+│   │   ├── HowItWorks.jsx        # 3-step explainer section
+│   │   ├── Navbar.jsx            # Smooth-scroll sticky navbar with mobile drawer
+│   │   ├── PromptCard.jsx        # Prompt card with views/copies stats
+│   │   ├── ProtectedRoute.jsx    # Client-side admin auth guard
+│   │   ├── SEO.jsx               # Dynamic OpenGraph and Twitter meta tags
+│   │   ├── Skeletons.jsx         # Loading skeleton placeholders
+│   │   ├── TrustedBy.jsx         # Client trust bar
+│   │   └── VariableForm.jsx      # Dynamic form generator for prompt variables
+│   ├── context/
+│   │   └── AuthContext.jsx       # Supabase authentication provider
+│   ├── data/
+│   │   └── mockData.js           # Fallback mock dataset
+│   ├── hooks/                    # Custom React hooks
+│   │   ├── useAuth.js            # Auth context hook
+│   │   ├── useCategories.js      # Categories fetch hook
+│   │   ├── usePromptBySlug.js    # Single prompt fetch hook
+│   │   ├── usePrompts.js         # Filtered prompts & pagination hook
+│   │   └── useSubcategories.js   # Subcategories fetch hook
+│   ├── pages/                    # Application route views
+│   │   ├── AdminDashboard.jsx    # Full-featured admin management console
+│   │   ├── AdminLogin.jsx        # Secure admin login view
+│   │   ├── Categories.jsx        # All categories index
+│   │   ├── CategoryDetail.jsx    # Category detail & subcategory filter view
+│   │   ├── Contact.jsx           # Visitor contact and prompt request form
+│   │   ├── Home.jsx              # Landing page
+│   │   ├── Latest.jsx            # Chronological prompts with infinite load
+│   │   ├── NotFound.jsx          # 404 page
+│   │   ├── Popular.jsx           # Top-viewed prompts ranking
+│   │   ├── Privacy.jsx           # Privacy policy
+│   │   ├── SearchResults.jsx     # Live debounced prompt search
+│   │   └── Terms.jsx             # Terms of service
+│   ├── services/
+│   │   ├── githubUpload.js       # Client caller for image upload API
+│   │   ├── promptService.js      # Supabase CRUD service layer
+│   │   └── supabaseClient.js     # Supabase client singleton
+│   ├── utils/
+│   │   └── variableParser.js     # Variable tokenizer, parser, and token estimator
+│   ├── App.jsx                   # Router and layout configuration
+│   ├── index.css                 # Global Tailwind layers & custom utilities
+│   └── main.jsx                  # React DOM root entrypoint
+├── supabase/
+│   └── schema.sql                # Complete PostgreSQL schema, RLS, and RPC functions
+├── .env.example                  # Environment variable configuration template
+├── tailwind.config.js            # Design system tokens, keyframes, and themes
+├── vercel.json                   # Vercel SPA routing and serverless rewrites
+└── vite.config.js                # Vite build configuration
+```
+
+---
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+- **Node.js**: v18.0 or higher
+- **npm** or **yarn** / **pnpm**
+- A free [Supabase](https://supabase.com/) account
+- A free [Vercel](https://vercel.com/) account
+
+### 2. Clone the Repository
 ```bash
-# Public Client (Vite)
+git clone https://github.com/amnashakeel487/prompt_vault.git
+cd prompt_vault
+```
+
+### 3. Install Dependencies
+```bash
+npm install
+```
+
+### 4. Configure Environment Variables
+Copy the `.env.example` template to `.env`:
+```bash
+cp .env.example .env
+```
+
+Fill in your credentials in `.env`:
+```env
+# Client-side (Vite)
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 VITE_SITE_URL=http://localhost:5173
 
-# Serverless Functions (local development with Vercel CLI)
-GITHUB_TOKEN=github_pat_your_token
+# Server-side (Vercel Serverless Functions)
+GITHUB_TOKEN=github_pat_your_personal_access_token
 GITHUB_OWNER=your-github-username
-GITHUB_REPO=your-image-repo
+GITHUB_REPO=your-image-repo-name
 GITHUB_BRANCH=main
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
 SITE_URL=http://localhost:5173
 ```
 
----
+### 5. Set Up the Supabase Database
+1. Go to your **[Supabase Dashboard](https://app.supabase.com)** → **SQL Editor**.
+2. Open [`supabase/schema.sql`](supabase/schema.sql) in this repository.
+3. Copy and run the SQL code to create:
+   - `categories`, `subcategories`, `prompts`, and `contact_messages` tables
+   - Row Level Security (RLS) policies
+   - `increment_views` and `increment_copies` stored functions
+   - Initial starter categories and sample prompts
 
-## 4. Local Development
-
-### Option A: Standard Vite Dev Server
+### 6. Run Local Development Server
 ```bash
-npm install
 npm run dev
 ```
-Open [http://localhost:5173](http://localhost:5173).
-
-### Option B: Local Vercel Serverless Dev (Tests API endpoints locally)
-```bash
-npm install -g vercel
-vercel dev
-```
+Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ---
 
-## 5. Deployment to Vercel
+## ☁️ Deployment on Vercel
 
-### Step 1: Push Code to GitHub
-Push your repository to GitHub.
-
-### Step 2: Import Project into Vercel
-1. Go to [vercel.com](https://vercel.com) and click **Add New → Project**.
-2. Import your GitHub repository.
-3. Framework Preset: **Vite** (detected automatically).
-
-### Step 3: Add Environment Variables in Vercel
-Under **Project Settings → Environment Variables**, add:
-
-| Name | Value | Target |
-| :--- | :--- | :--- |
-| `VITE_SUPABASE_URL` | `https://your-project.supabase.co` | Production, Preview, Development |
-| `VITE_SUPABASE_ANON_KEY` | `your-supabase-anon-key` | Production, Preview, Development |
-| `VITE_SITE_URL` | `https://your-custom-domain.com` (or Vercel URL) | Production, Preview |
-| `GITHUB_TOKEN` | `ghp_...` / `github_pat_...` *(Secret)* | Production, Preview, Development |
-| `GITHUB_OWNER` | `your-github-username` | Production, Preview, Development |
-| `GITHUB_REPO` | `your-image-repo` | Production, Preview, Development |
-| `GITHUB_BRANCH` | `main` | Production, Preview, Development |
-| `SUPABASE_URL` | `https://your-project.supabase.co` | Production, Preview, Development |
-| `SUPABASE_ANON_KEY` | `your-supabase-anon-key` | Production, Preview, Development |
-| `SITE_URL` | `https://your-custom-domain.com` | Production, Preview |
-
-### Step 4: Deploy
-Click **Deploy**. Your app is live with full SPA routing, dynamic sitemaps, authenticated admin capabilities, and secure serverless image uploads!
+1. Push your code to your GitHub repository.
+2. Go to **[Vercel](https://vercel.com)** → **Add New Project** → Import `prompt_vault`.
+3. Confirm Build Settings:
+   - **Framework Preset**: `Vite`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+4. Add Environment Variables in Vercel (**Settings → Environment Variables**):
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_SITE_URL`
+   - `GITHUB_TOKEN` *(server-side)*
+   - `GITHUB_OWNER` *(server-side)*
+   - `GITHUB_REPO` *(server-side)*
+   - `GITHUB_BRANCH` *(server-side)*
+   - `SUPABASE_URL` *(server-side)*
+   - `SUPABASE_ANON_KEY` *(server-side)*
+   - `SITE_URL` *(server-side)*
+5. Click **Deploy**.
+6. In **Supabase Dashboard → Authentication → URL Configuration**, add your Vercel domain as the **Site URL** and **Redirect URL** (e.g. `https://prompt-vault.vercel.app/**`).
 
 ---
 
-## Project Structure
+## 🔒 Security Architecture
 
-```
-prompt-vault/
-├── api/
-│   ├── sitemap.js          # Dynamic XML Sitemap serverless function
-│   └── upload-image.js     # Secure GitHub image uploader serverless function
-├── public/
-│   └── robots.txt          # SEO robots.txt with sitemap reference
-├── src/
-│   ├── components/         # Reusable UI components (PromptCard, CategoryCard, SEO, etc.)
-│   ├── context/
-│   │   └── AuthContext.jsx # Admin session context and listener
-│   ├── hooks/              # Custom hooks (usePrompts, useCategories, useAuth, etc.)
-│   ├── pages/              # App routes (Home, Categories, Details, AdminDashboard, etc.)
-│   ├── services/
-│   │   ├── githubUpload.js   # Client service for image upload
-│   │   ├── promptService.js  # Supabase CRUD and counter operations
-│   │   └── supabaseClient.js # Initialized Supabase client
-│   └── utils/
-│       └── variableParser.js # {{Variable}} extraction & template engine
-├── supabase/
-│   └── schema.sql          # Complete DB migration, RLS policies, RPCs, seed data
-├── tailwind.config.js
-├── vercel.json             # SPA rewrites & sitemap routing
-└── package.json
-```
+- **Row Level Security (RLS)**: Public visitors can only view published prompts and insert contact messages. All administrative operations (create, update, delete, view contact messages) strictly require an authenticated Supabase session.
+- **Serverless Secrets**: Sensitive tokens such as `GITHUB_TOKEN` are kept strictly server-side in Vercel Serverless Functions (`/api/upload-image.js`) and never exposed in client JavaScript bundles.
+- **JWT Verification**: Every image upload request validates the caller's Supabase JWT authorization header before dispatching requests to GitHub.
+
+---
+
+## 👨‍💻 Authors & Credits
+
+- **Developer**: **[Amna Shakeel](https://www.linkedin.com/in/amna-shakeel21)**
+- **Organization**: **[WeConnect Innovations](https://www.linkedin.com/in/abdullahwale)**
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — feel free to use, modify, and distribute with attribution.
