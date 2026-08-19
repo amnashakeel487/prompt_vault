@@ -26,7 +26,7 @@ export default function PromptCard({ prompt, index = 0 }) {
     >
       <Link
         to={`/prompt/${prompt.slug}`}
-        className="glass-card group flex flex-col justify-between h-full transition-transform hover:-translate-y-1 hover:shadow-glow"
+        className="glass-card group flex flex-col justify-between h-full transition-transform hover:-translate-y-1 hover:shadow-glow text-inherit"
       >
         <div>
           <div className="relative h-36 sm:h-40 w-full overflow-hidden aspect-[16/10]">
@@ -46,10 +46,16 @@ export default function PromptCard({ prompt, index = 0 }) {
             )}
           </div>
           <div className="p-3.5 sm:p-4">
-            <h3 className="font-display text-sm sm:text-base font-semibold text-ink line-clamp-1 group-hover:text-violet-soft transition-colors">
+            <h3
+              style={{ color: '#FFFFFF' }}
+              className="font-display text-sm sm:text-base font-semibold text-white line-clamp-1 group-hover:!text-violet-soft transition-colors"
+            >
               {prompt.title}
             </h3>
-            <p className="mt-1.5 text-xs sm:text-sm text-ink-muted line-clamp-2 leading-relaxed">
+            <p
+              style={{ color: '#C8C4E6' }}
+              className="mt-1.5 text-xs sm:text-sm text-ink-muted line-clamp-2 leading-relaxed"
+            >
               {prompt.description}
             </p>
             {tags.length > 0 && (

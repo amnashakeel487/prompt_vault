@@ -5,17 +5,21 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    color: #F4F2FF;
   }
   body {
     @apply bg-base text-ink font-body antialiased;
     background-image: var(--tw-gradient, none);
+    color: #F4F2FF;
   }
-  /* Prevent browsers from resetting button text to black */
-  button {
+  /* Prevent browsers from resetting button and link text to black */
+  button, a {
     color: inherit;
+    text-decoration: inherit;
   }
-  h1, h2, h3, h4 {
+  h1, h2, h3, h4, h5, h6 {
     @apply font-display;
+    color: #FFFFFF;
   }
   ::selection {
     @apply bg-violet/40 text-white;
