@@ -26,8 +26,8 @@ export default {
         },
         ink: {
           DEFAULT: '#F4F2FF',
-          muted: '#9C96B8',
-          faint: '#645F80',
+          muted: '#C8C4E6',
+          faint: '#A09ABF',
         },
       },
       fontFamily: {

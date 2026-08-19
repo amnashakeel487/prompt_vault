@@ -13,7 +13,7 @@ export default function TrustedBy() {
   return (
     <section className="border-y border-line bg-surface/30">
       <div className="section-pad py-6 sm:py-8 text-center">
-        <p className="text-[10px] sm:text-[11px] font-mono uppercase tracking-widest text-ink-faint">
+        <p className="text-[10px] sm:text-[11px] font-mono uppercase tracking-widest text-ink-muted/80">
           Trusted by teams shipping content faster
         </p>
 
@@ -25,7 +25,7 @@ export default function TrustedBy() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: i * 0.08 }}
-              className="font-display text-xs sm:text-sm font-semibold tracking-tight text-ink-faint transition-colors hover:text-ink-muted select-none"
+              className="font-display text-xs sm:text-sm font-semibold tracking-tight text-ink-muted hover:text-white transition-colors select-none"
             >
               {name}
             </motion.span>
