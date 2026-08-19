@@ -8,17 +8,30 @@ export default function Footer() {
         <div>
           <div className="flex items-center gap-2">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-violet to-cyan">
-              <Zap size={16} strokeWidth={2.5} />
+              <Zap size={16} strokeWidth={2.5} className="text-white" />
             </span>
-            <span className="font-display text-base sm:text-lg font-semibold">PromptVault</span>
+            <span
+              style={{ color: '#FFFFFF' }}
+              className="font-display text-base sm:text-lg font-semibold text-white tracking-tight"
+            >
+              PromptVault
+            </span>
           </div>
-          <p className="mt-2.5 sm:mt-3 text-xs sm:text-sm text-ink-muted max-w-xs leading-relaxed">
+          <p
+            style={{ color: '#C8C4E6' }}
+            className="mt-2.5 sm:mt-3 text-xs sm:text-sm text-ink-muted max-w-xs leading-relaxed"
+          >
             A curated library of ready-to-run AI prompts. Fill the variables, generate, copy, ship.
           </p>
         </div>
 
         <div>
-          <h4 className="text-xs sm:text-sm font-semibold text-ink mb-2.5 sm:mb-3">Explore</h4>
+          <h4
+            style={{ color: '#FFFFFF' }}
+            className="text-xs sm:text-sm font-semibold text-white mb-2.5 sm:mb-3"
+          >
+            Explore
+          </h4>
           <ul className="space-y-2 text-xs sm:text-sm text-ink-muted">
             <li><Link to="/categories" className="hover:text-white transition-colors">Categories</Link></li>
             <li><Link to="/latest" className="hover:text-white transition-colors">Latest Prompts</Link></li>
@@ -28,7 +41,12 @@ export default function Footer() {
         </div>
 
         <div>
-          <h4 className="text-xs sm:text-sm font-semibold text-ink mb-2.5 sm:mb-3">Company</h4>
+          <h4
+            style={{ color: '#FFFFFF' }}
+            className="text-xs sm:text-sm font-semibold text-white mb-2.5 sm:mb-3"
+          >
+            Company
+          </h4>
           <ul className="space-y-2 text-xs sm:text-sm text-ink-muted">
             <li><Link to="/contact" className="hover:text-white transition-colors">Contact</Link></li>
             <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
@@ -37,7 +55,12 @@ export default function Footer() {
         </div>
 
         <div>
-          <h4 className="text-xs sm:text-sm font-semibold text-ink mb-2.5 sm:mb-3">Connect</h4>
+          <h4
+            style={{ color: '#FFFFFF' }}
+            className="text-xs sm:text-sm font-semibold text-white mb-2.5 sm:mb-3"
+          >
+            Connect
+          </h4>
           <div className="flex gap-2.5 sm:gap-3">
             <a
               href="https://github.com/amnashakeel487/prompt_vault"
@@ -62,8 +85,8 @@ export default function Footer() {
       </div>
 
       <div className="border-t border-line py-5 sm:py-6 text-center space-y-1.5 text-[11px] sm:text-xs text-ink-faint px-4">
-        <p>© {new Date().getFullYear()} PromptVault. All rights reserved.</p>
-        <p className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5">
+        <p style={{ color: '#A09ABF' }}>© {new Date().getFullYear()} PromptVault. All rights reserved.</p>
+        <p className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5" style={{ color: '#A09ABF' }}>
           <span>Developed by</span>
           <a
             href="https://www.linkedin.com/in/amna-shakeel21"
