@@ -48,7 +48,7 @@ export default function Home() {
               <span className="bg-gradient-to-r from-violet-soft to-cyan bg-clip-text text-transparent">fill-in-the-blank</span>{' '}
               shortcut.
             </h1>
-            <p className="mt-4 sm:mt-5 max-w-lg text-sm sm:text-base text-ink-muted leading-relaxed">
+            <p className="mt-4 sm:mt-5 max-w-lg text-sm sm:text-base text-white leading-relaxed">
               Browse a library of production-tested AI prompts. Swap in your business, audience, and tone —
               PromptVault detects the variables and builds the form for you.
             </p>
@@ -63,15 +63,15 @@ export default function Home() {
             <div className="mt-8 sm:mt-10 grid grid-cols-3 gap-2 sm:gap-6 pt-4 border-t border-line/40 sm:border-0 sm:pt-0">
               <div>
                 <p className="font-display text-xl sm:text-2xl font-semibold text-ink">{totalPromptCount}</p>
-                <p className="text-xs sm:text-sm text-ink-faint">Prompts</p>
+                <p className="text-xs sm:text-sm text-white/70">Prompts</p>
               </div>
               <div>
                 <p className="font-display text-xl sm:text-2xl font-semibold text-ink">{totalCategoriesCount}</p>
-                <p className="text-xs sm:text-sm text-ink-faint">Categories</p>
+                <p className="text-xs sm:text-sm text-white/70">Categories</p>
               </div>
               <div>
                 <p className="font-display text-xl sm:text-2xl font-semibold text-ink">40k+</p>
-                <p className="text-xs sm:text-sm text-ink-faint">Copies</p>
+                <p className="text-xs sm:text-sm text-white/70">Copies</p>
               </div>
             </div>
           </motion.div>
