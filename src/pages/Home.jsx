@@ -48,7 +48,10 @@ export default function Home() {
               <span className="bg-gradient-to-r from-violet-soft to-cyan bg-clip-text text-transparent">fill-in-the-blank</span>{' '}
               shortcut.
             </h1>
-            <p className="mt-4 sm:mt-5 max-w-lg text-sm sm:text-base text-white leading-relaxed">
+            <p
+              style={{ color: '#FFFFFF' }}
+              className="mt-4 sm:mt-5 max-w-lg text-sm sm:text-base !text-white leading-relaxed font-normal"
+            >
               Browse a library of production-tested AI prompts. Swap in your business, audience, and tone —
               PromptVault detects the variables and builds the form for you.
             </p>
