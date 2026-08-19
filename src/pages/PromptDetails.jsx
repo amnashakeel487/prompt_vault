@@ -293,10 +293,10 @@ export default function PromptDetails() {
                 <dt className="text-ink-faint">Status</dt>
                 <dd className="capitalize text-ink-muted">{prompt.status}</dd>
               </div>
-              {prompt.images && prompt.images.length > 0 && (
+              {allImages.length > 1 && (
                 <div className="flex justify-between">
                   <dt className="text-ink-faint">Gallery</dt>
-                  <dd className="text-cyan font-mono">{prompt.images.length} images</dd>
+                  <dd className="text-cyan font-mono">{allImages.length} images</dd>
                 </div>
               )}
             </dl>

@@ -405,7 +405,7 @@ export async function getAdminPrompts(userProfile = null) {
   try {
     let query = supabase
       .from('prompts')
-      .select('*')
+      .select('*, categories(*), subcategories(*), prompt_images(*)')
       .order('created_at', { ascending: false })
 
     // Scope to category if user is a category admin
@@ -434,7 +434,7 @@ export async function getPendingPrompts() {
   try {
     const { data, error } = await supabase
       .from('prompts')
-      .select('*')
+      .select('*, categories(*), subcategories(*), prompt_images(*)')
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import {
   FileText,
@@ -23,6 +23,7 @@ import {
   Layers,
   Settings,
   AlertCircle,
+  AlertTriangle,
   Lock,
   Mail,
   RefreshCw,
@@ -50,7 +51,6 @@ import {
   Shield,
   CheckCircle,
   XCircle,
-  AlertTriangle,
   Link2,
   Image as ImageIcon,
   Star,
@@ -89,6 +89,7 @@ import {
 import { uploadImageToGitHub } from '../services/githubUpload'
 import { formatGoogleDriveImageUrl, extractGoogleDriveId, detectImageSource } from '../utils/googleDrive'
 import { extractVariables } from '../utils/variableParser'
+import { getUploadErrorSuggestions } from '../utils/configChecker'
 
 const AVAILABLE_ICONS = [
   { name: 'Sparkles', icon: Sparkles },
@@ -114,10 +115,30 @@ export default function AdminDashboard() {
     isCategoryAdmin,
     assignedCategoryId,
     signOut,
+    loading: authLoading,
   } = useAuth()
+
+  // Early return if auth is still loading to prevent rendering before user data is available
+  if (authLoading || !user?.id) {
+    return (
+      <div className="min-h-screen bg-base text-ink flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet border-t-transparent" />
+          <p className="text-xs text-ink-muted">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   const [activeTab, setActiveTab] = useState('prompts') // 'prompts' | 'pending' | 'categories' | 'admins' | 'messages' | 'analytics' | 'profile'
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Redirect category admins away from super admin only tabs
+  useEffect(() => {
+    if (!isSuperAdmin && (activeTab === 'messages' || activeTab === 'pending' || activeTab === 'categories' || activeTab === 'admins')) {
+      setActiveTab('prompts')
+    }
+  }, [isSuperAdmin, activeTab])
 
   // Data States
   const [promptsList, setPromptsList] = useState([])
@@ -136,6 +157,7 @@ export default function AdminDashboard() {
 
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [dataLoaded, setDataLoaded] = useState(false)
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' })
 
   // Filters
@@ -171,6 +193,10 @@ export default function AdminDashboard() {
   const [imageSourceTab, setImageSourceTab] = useState('github') // 'github' | 'drive' | 'url'
   const [driveUrlInput, setDriveUrlInput] = useState('')
   const [directUrlInput, setDirectUrlInput] = useState('')
+
+  // Upload States
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadError, setUploadError] = useState('')
 
   // Reject Modal State
   const [rejectModal, setRejectModal] = useState({
@@ -224,10 +250,16 @@ export default function AdminDashboard() {
   }, [assignedCategoryId, categoriesList])
 
   useEffect(() => {
-    loadData()
-  }, [user?.id, role])
+    // Only load data when we have a stable user and profile, and haven't loaded yet
+    if (user?.id && profile?.role && !dataLoaded && !loading && !refreshing) {
+      loadData()
+    }
+  }, [user?.id, profile?.role, dataLoaded, loading, refreshing, loadData])
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
+    // Prevent multiple concurrent loading operations
+    if (loading || refreshing) return
+    
     try {
       setLoading(true)
       const userProfile = profile || { role, assigned_category_id: assignedCategoryId }
@@ -236,7 +268,7 @@ export default function AdminDashboard() {
         getAdminPrompts(userProfile).catch(() => []),
         getCategories().catch(() => []),
         getAdminStats(userProfile).catch(() => ({ totalPrompts: 0, totalCategories: 0, totalViews: 0, totalCopies: 0, pendingCount: 0 })),
-        getContactMessages().catch(() => []),
+        isSuperAdmin ? getContactMessages().catch(() => []) : Promise.resolve([]),
         isSuperAdmin ? getPendingPrompts().catch(() => []) : Promise.resolve([]),
         isSuperAdmin ? getAdminProfiles().catch(() => []) : Promise.resolve([]),
       ])
@@ -244,25 +276,28 @@ export default function AdminDashboard() {
       setPromptsList(prompts || [])
       setCategoriesList(cats || [])
       setStats(adminStats || { totalPrompts: 0, totalCategories: 0, totalViews: 0, totalCopies: 0, pendingCount: 0 })
-      setMessagesList(messages || [])
 
       if (isSuperAdmin) {
+        setMessagesList(messages || [])
         setPendingList(pending || [])
         setAdminsList(admins || [])
       }
+      
+      setDataLoaded(true)
     } catch (err) {
       console.error('Error loading dashboard data:', err)
     } finally {
       setLoading(false)
     }
-  }
+  }, [profile, role, assignedCategoryId, isSuperAdmin, loading, refreshing])
 
-  async function handleRefresh() {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true)
+    setDataLoaded(false) // Reset dataLoaded to allow reloading
     await loadData()
     setRefreshing(false)
     notify('success', 'Dashboard data refreshed.')
-  }
+  }, [loadData])
 
   function notify(type, text) {
     setStatusMessage({ type, text })
@@ -449,7 +484,8 @@ export default function AdminDashboard() {
     try {
       setUploadingImage(true)
       setUploadError('')
-      const rawUrl = await uploadImageToGitHub(file, 'prompts')
+      const result = await uploadImageToGitHub(file, 'prompts')
+      const rawUrl = result.url
       const newImg = {
         imageUrl: rawUrl,
         source: 'github',
@@ -467,7 +503,9 @@ export default function AdminDashboard() {
       })
     } catch (err) {
       console.error('Upload failed:', err)
-      setUploadError(err.message || 'Image upload failed. Check GitHub settings or use Google Drive link.')
+      const suggestions = getUploadErrorSuggestions(err.message)
+      const errorWithSuggestions = `${err.message}\n\nSuggestions:\n${suggestions.map(s => `• ${s}`).join('\n')}`
+      setUploadError(errorWithSuggestions)
     } finally {
       setUploadingImage(false)
     }
@@ -761,7 +799,7 @@ export default function AdminDashboard() {
     return matchesSearch && matchesStatus && matchesCat
   })
 
-  const unreadMessagesCount = messagesList.filter((m) => !m.read).length
+  const unreadMessagesCount = isSuperAdmin ? messagesList.filter((m) => !m.read).length : 0
   const pendingReviewCount = isSuperAdmin ? pendingList.length : 0
 
   return (
@@ -891,16 +929,19 @@ export default function AdminDashboard() {
               />
             )}
 
-            <SidebarLink
-              active={activeTab === 'messages'}
-              onClick={() => {
-                setActiveTab('messages')
-                setSidebarOpen(false)
-              }}
-              icon={Inbox}
-              label="Contact Inbox"
-              badge={unreadMessagesCount > 0 ? `${unreadMessagesCount} new` : messagesList.length}
-            />
+            {/* Contact Inbox (Super Admin only) */}
+            {isSuperAdmin && (
+              <SidebarLink
+                active={activeTab === 'messages'}
+                onClick={() => {
+                  setActiveTab('messages')
+                  setSidebarOpen(false)
+                }}
+                icon={Inbox}
+                label="Contact Inbox"
+                badge={unreadMessagesCount > 0 ? `${unreadMessagesCount} new` : messagesList.length}
+              />
+            )}
 
             <SidebarLink
               active={activeTab === 'analytics'}
@@ -1206,7 +1247,9 @@ export default function AdminDashboard() {
                           </td>
                           <td className="px-4 py-3.5 text-ink-faint">
                             <span className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan">
-                              <ImageIcon size={12} /> {p.images?.length || 1}
+                              <ImageIcon size={12} /> 
+                              {Array.isArray(p.images) ? p.images.length : 
+                               (p.featuredImage ? 1 : 0)}
                             </span>
                           </td>
                           <td className="px-4 py-3.5 text-right">
@@ -1494,9 +1537,9 @@ export default function AdminDashboard() {
         )}
 
         {/* ------------------------------------------------------------------ */}
-        {/* TAB 5: CONTACT INBOX                                              */}
+        {/* TAB 5: CONTACT INBOX (Super Admin Only)                          */}
         {/* ------------------------------------------------------------------ */}
-        {activeTab === 'messages' && (
+        {activeTab === 'messages' && isSuperAdmin && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1915,9 +1958,22 @@ export default function AdminDashboard() {
                 )}
 
                 {uploadError && (
-                  <p className="text-[11px] text-red-400 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
-                    {uploadError}
-                  </p>
+                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-red-400 text-xs">
+                      <AlertTriangle size={13} />
+                      <span className="font-medium">Upload Failed</span>
+                    </div>
+                    <div className="text-[11px] text-red-300/90 whitespace-pre-line">
+                      {uploadError.split('\n').map((line, index) => (
+                        <div key={index} className={line.startsWith('•') ? 'ml-2' : ''}>
+                          {line}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-[10px] text-red-200/70 mt-2">
+                      💡 <strong>Alternative:</strong> Use Google Drive Link or Direct Image URL tabs above as a workaround
+                    </div>
+                  </div>
                 )}
 
                 {/* Attached Images Grid */}
