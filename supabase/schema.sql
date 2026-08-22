@@ -94,6 +94,53 @@ CREATE TABLE IF NOT EXISTS public.contact_messages (
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
+-- 7. FAVORITES TABLE (Public User Favorites)
+CREATE TABLE IF NOT EXISTS public.favorites (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    prompt_id TEXT NOT NULL REFERENCES public.prompts(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    UNIQUE(user_id, prompt_id)
+);
+
+-- 8. TEAM MEMBER REQUESTS TABLE
+CREATE TABLE IF NOT EXISTS public.team_member_requests (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    requested_category_id TEXT REFERENCES public.categories(id) ON DELETE SET NULL,
+    status TEXT DEFAULT 'pending' NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+    message TEXT,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Add content_type field to prompts for videos support
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'prompts' AND column_name = 'content_type'
+    ) THEN
+        ALTER TABLE public.prompts ADD COLUMN content_type TEXT DEFAULT 'prompt' CHECK (content_type IN ('prompt', 'video'));
+    END IF;
+
+    -- Add video_url field for video content
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'prompts' AND column_name = 'video_url'
+    ) THEN
+        ALTER TABLE public.prompts ADD COLUMN video_url TEXT;
+    END IF;
+
+    -- Add favorites_count field for easier querying
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'prompts' AND column_name = 'favorites_count'
+    ) THEN
+        ALTER TABLE public.prompts ADD COLUMN favorites_count INTEGER DEFAULT 0 NOT NULL;
+    END IF;
+END $$;
+
 -- 7. PERFORMANCE INDEXES
 CREATE INDEX IF NOT EXISTS idx_prompts_slug ON public.prompts(slug);
 CREATE INDEX IF NOT EXISTS idx_prompts_status ON public.prompts(status);
@@ -102,6 +149,8 @@ CREATE INDEX IF NOT EXISTS idx_prompts_subcategory_id ON public.prompts(subcateg
 CREATE INDEX IF NOT EXISTS idx_prompts_created_at ON public.prompts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_prompts_views ON public.prompts(views DESC);
 CREATE INDEX IF NOT EXISTS idx_prompts_copies ON public.prompts(copies DESC);
+CREATE INDEX IF NOT EXISTS idx_prompts_favorites_count ON public.prompts(favorites_count DESC);
+CREATE INDEX IF NOT EXISTS idx_prompts_content_type ON public.prompts(content_type);
 CREATE INDEX IF NOT EXISTS idx_prompts_featured ON public.prompts(featured) WHERE featured = TRUE;
 CREATE INDEX IF NOT EXISTS idx_prompts_trending ON public.prompts(trending) WHERE trending = TRUE;
 CREATE INDEX IF NOT EXISTS idx_categories_slug ON public.categories(slug);
@@ -111,6 +160,10 @@ CREATE INDEX IF NOT EXISTS idx_prompt_images_sort ON public.prompt_images(sort_o
 CREATE INDEX IF NOT EXISTS idx_admin_profiles_role ON public.admin_profiles(role);
 CREATE INDEX IF NOT EXISTS idx_admin_profiles_category ON public.admin_profiles(assigned_category_id);
 CREATE INDEX IF NOT EXISTS idx_contact_messages_created_at ON public.contact_messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON public.favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_prompt_id ON public.favorites(prompt_id);
+CREATE INDEX IF NOT EXISTS idx_team_requests_status ON public.team_member_requests(status);
+CREATE INDEX IF NOT EXISTS idx_team_requests_user ON public.team_member_requests(user_id);
 
 -- ==============================================================================
 -- 8. HELPER SECURITY FUNCTIONS FOR RLS
@@ -163,6 +216,8 @@ ALTER TABLE public.prompts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.prompt_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.admin_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.favorites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.team_member_requests ENABLE ROW LEVEL SECURITY;
 
 -- ------------------------------------------------------------------------------
 -- A. Categories RLS Policies
@@ -341,6 +396,41 @@ CREATE POLICY "Authenticated admins have access to contact messages"
     WITH CHECK (true);
 
 -- ------------------------------------------------------------------------------
+-- G. Favorites RLS Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Users can manage their own favorites" ON public.favorites;
+CREATE POLICY "Users can manage their own favorites"
+    ON public.favorites FOR ALL
+    TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Anyone can read favorites aggregates" ON public.favorites;
+CREATE POLICY "Anyone can read favorites aggregates"
+    ON public.favorites FOR SELECT
+    TO public
+    USING (true);
+
+-- ------------------------------------------------------------------------------
+-- H. Team Member Requests RLS Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Users can manage their own requests" ON public.team_member_requests;
+CREATE POLICY "Users can manage their own requests"
+    ON public.team_member_requests
+    FOR ALL
+    TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Super admins can manage all requests" ON public.team_member_requests;
+CREATE POLICY "Super admins can manage all requests"
+    ON public.team_member_requests
+    FOR ALL
+    TO authenticated
+    USING (public.is_super_admin())
+    WITH CHECK (public.is_super_admin());
+
+-- ------------------------------------------------------------------------------
 -- 10. RPC STORED PROCEDURES FOR ATOMIC COUNTER INCREMENTS
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.increment_views(prompt_id TEXT)
@@ -369,9 +459,86 @@ BEGIN
 END;
 $$;
 
+-- Update favorites count when favorites are added/removed
+CREATE OR REPLACE FUNCTION public.update_favorites_count()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE public.prompts
+        SET favorites_count = favorites_count + 1
+        WHERE id = NEW.prompt_id;
+        RETURN NEW;
+    ELSIF TG_OP = 'DELETE' THEN
+        UPDATE public.prompts
+        SET favorites_count = favorites_count - 1
+        WHERE id = OLD.prompt_id;
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+-- Create trigger for favorites count
+DROP TRIGGER IF EXISTS favorites_count_trigger ON public.favorites;
+CREATE TRIGGER favorites_count_trigger
+    AFTER INSERT OR DELETE ON public.favorites
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_favorites_count();
+
+-- Function to approve team member request and create admin profile
+CREATE OR REPLACE FUNCTION public.approve_team_member_request(
+    request_id TEXT,
+    assigned_category_id TEXT DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    request_row public.team_member_requests%ROWTYPE;
+BEGIN
+    -- Only super admins can approve requests
+    IF NOT public.is_super_admin() THEN
+        RAISE EXCEPTION 'Only super admins can approve team member requests';
+    END IF;
+
+    -- Get the request details
+    SELECT * INTO request_row
+    FROM public.team_member_requests
+    WHERE id = request_id AND status = 'pending';
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Request not found or already processed';
+    END IF;
+
+    -- Update request status
+    UPDATE public.team_member_requests
+    SET status = 'approved', updated_at = NOW()
+    WHERE id = request_id;
+
+    -- Create admin profile (use assigned_category_id if provided, otherwise use requested)
+    INSERT INTO public.admin_profiles (id, role, assigned_category_id, display_name)
+    VALUES (
+        request_row.user_id,
+        'category_admin',
+        COALESCE(assigned_category_id, request_row.requested_category_id),
+        (SELECT email FROM auth.users WHERE id = request_row.user_id)
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        role = 'category_admin',
+        assigned_category_id = COALESCE(assigned_category_id, request_row.requested_category_id);
+END;
+$$;
+
 -- Grant execution to public / anon and authenticated
 GRANT EXECUTE ON FUNCTION public.increment_views(TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.increment_copies(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.approve_team_member_request(TEXT, TEXT) TO authenticated;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 
 

@@ -5,29 +5,29 @@ export default {
     extend: {
       colors: {
         base: {
-          DEFAULT: '#0A0A12',
-          soft: '#0E0D18',
+          DEFAULT: 'var(--color-base)',
+          soft: 'var(--color-base-soft)',
         },
         surface: {
-          DEFAULT: '#14131F',
-          2: '#1B1A2B',
+          DEFAULT: 'var(--color-surface)',
+          2: 'var(--color-surface-2)',
         },
-        line: 'rgba(255,255,255,0.08)',
+        line: 'var(--color-line)',
         violet: {
-          DEFAULT: '#7C5CFF',
-          soft: '#9B82FF',
-          dim: '#5A3FD9',
+          DEFAULT: 'var(--color-violet)',
+          soft: 'var(--color-violet-soft)',
+          dim: 'var(--color-violet-dim)',
         },
         cyan: {
-          DEFAULT: '#3DD6F5',
+          DEFAULT: 'var(--color-cyan)',
         },
         amber: {
-          DEFAULT: '#FFB86B',
+          DEFAULT: 'var(--color-amber)',
         },
         ink: {
-          DEFAULT: '#F4F2FF',
-          muted: '#C8C4E6',
-          faint: '#A09ABF',
+          DEFAULT: 'var(--color-ink)',
+          muted: 'var(--color-ink-muted)',
+          faint: 'var(--color-ink-faint)',
         },
       },
       fontFamily: {
@@ -36,14 +36,12 @@ export default {
         mono: ['"JetBrains Mono"', 'monospace'],
       },
       backgroundImage: {
-        'grid-glow':
-          'radial-gradient(circle at 20% 0%, rgba(124,92,255,0.18), transparent 45%), radial-gradient(circle at 85% 15%, rgba(61,214,245,0.12), transparent 40%)',
-        'card-sheen':
-          'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 60%)',
+        'grid-glow': 'var(--bg-grid-glow)',
+        'card-sheen': 'var(--bg-card-sheen)',
       },
       boxShadow: {
-        glow: '0 0 0 1px rgba(124,92,255,0.25), 0 8px 30px -8px rgba(124,92,255,0.45)',
-        card: '0 4px 24px -8px rgba(0,0,0,0.5)',
+        glow: 'var(--shadow-glow)',
+        card: 'var(--shadow-card)',
       },
       keyframes: {
         blink: { '0%,100%': { opacity: 1 }, '50%': { opacity: 0 } },

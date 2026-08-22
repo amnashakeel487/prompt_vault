@@ -54,6 +54,9 @@ export function formatPrompt(raw) {
     author: raw.author || 'Admin',
     views: Number(raw.views || 0),
     copies: Number(raw.copies || 0),
+    favorites: Number(raw.favorites_count || raw.favorites || 0),
+    favoritesCount: Number(raw.favorites_count || raw.favorites || 0),
+    favorites_count: Number(raw.favorites_count || raw.favorites || 0),
     featured: Boolean(raw.featured),
     popular: Boolean(raw.popular),
     trending: Boolean(raw.trending),
@@ -64,6 +67,10 @@ export function formatPrompt(raw) {
     seo_title: raw.seo_title || raw.title || '',
     seoDescription: raw.seo_description || raw.description || '',
     seo_description: raw.seo_description || raw.description || '',
+    contentType: raw.content_type || 'prompt', // 'prompt' | 'video'
+    content_type: raw.content_type || 'prompt',
+    videoUrl: raw.video_url || '',
+    video_url: raw.video_url || '',
     createdAt: raw.created_at ? new Date(raw.created_at).toISOString().split('T')[0] : '',
     created_at: raw.created_at,
     updatedAt: raw.updated_at ? new Date(raw.updated_at).toISOString().split('T')[0] : '',
@@ -298,7 +305,11 @@ export async function getPrompts({
   page = 1,
   limit = 12,
 } = {}) {
-  let query = supabase.from('prompts').select('*, prompt_images(*)', { count: 'exact' })
+  let query = supabase.from('prompts').select(`
+    *, 
+    prompt_images(*),
+    favorites_count:favorites(count)
+  `, { count: 'exact' })
 
   // Public site only shows published
   if (status) {
@@ -325,8 +336,13 @@ export async function getPrompts({
   }
 
   // Sorting
-  const sortCol = sort === 'createdAt' ? 'created_at' : sort
-  query = query.order(sortCol, { ascending: order === 'asc' })
+  let sortCol = sort === 'createdAt' ? 'created_at' : sort
+  if (sort === 'favorites') {
+    // For favorites sorting, we'll sort by a computed field
+    query = query.order('created_at', { ascending: false }) // fallback ordering
+  } else {
+    query = query.order(sortCol, { ascending: order === 'asc' })
+  }
 
   // Range pagination
   if (limit) {
@@ -341,8 +357,23 @@ export async function getPrompts({
     throw error
   }
 
+  // Format prompts and add favorites count
+  let prompts = (data || []).map(formatPrompt).map(prompt => ({
+    ...prompt,
+    favoritesCount: prompt.favorites_count?.[0]?.count || 0
+  }))
+
+  // Handle favorites sorting in JavaScript since Supabase can't sort by aggregated field easily
+  if (sort === 'favorites') {
+    prompts = prompts.sort((a, b) => {
+      const aFav = a.favoritesCount || 0
+      const bFav = b.favoritesCount || 0
+      return order === 'asc' ? aFav - bFav : bFav - aFav
+    })
+  }
+
   return {
-    prompts: (data || []).map(formatPrompt),
+    prompts,
     total: count || 0,
     page,
     limit,
@@ -929,4 +960,393 @@ export async function deleteContactMessage(id) {
     throw error
   }
   return true
+}
+/**
+ * PUBLIC USER FAVORITES FUNCTIONS
+ */
+
+/**
+ * Toggle favorite status for a prompt by a user
+ */
+export async function toggleFavorite(userId, promptId) {
+  if (!userId || !promptId) {
+    throw new Error('User ID and Prompt ID are required')
+  }
+
+  // Check if favorite already exists
+  const { data: existing, error: checkError } = await supabase
+    .from('favorites')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('prompt_id', promptId)
+    .single()
+
+  if (checkError && checkError.code !== 'PGRST116') {
+    console.error('Error checking favorite:', checkError)
+    throw checkError
+  }
+
+  if (existing) {
+    // Remove favorite
+    const { error: deleteError } = await supabase
+      .from('favorites')
+      .delete()
+      .eq('user_id', userId)
+      .eq('prompt_id', promptId)
+
+    if (deleteError) {
+      console.error('Error removing favorite:', deleteError)
+      throw deleteError
+    }
+
+    return { favorited: false }
+  } else {
+    // Add favorite
+    const { error: insertError } = await supabase
+      .from('favorites')
+      .insert({
+        user_id: userId,
+        prompt_id: promptId,
+      })
+
+    if (insertError) {
+      console.error('Error adding favorite:', insertError)
+      throw insertError
+    }
+
+    return { favorited: true }
+  }
+}
+
+/**
+ * Check if a prompt is favorited by a user
+ */
+export async function isPromptFavorited(userId, promptId) {
+  if (!userId || !promptId) return false
+
+  const { data, error } = await supabase
+    .from('favorites')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('prompt_id', promptId)
+    .single()
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error checking if prompt is favorited:', error)
+    return false
+  }
+
+  return !!data
+}
+
+/**
+ * Get user's favorites with prompt details
+ */
+export async function getUserFavorites(userId, { page = 1, limit = 12 } = {}) {
+  if (!userId) {
+    throw new Error('User ID is required')
+  }
+
+  let query = supabase
+    .from('favorites')
+    .select(`
+      id,
+      created_at,
+      prompts!inner(
+        *,
+        categories(*),
+        prompt_images(*),
+        favorites_count:favorites(count)
+      )
+    `, { count: 'exact' })
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (limit) {
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+    query = query.range(from, to)
+  }
+
+  const { data, count, error } = await query
+
+  if (error) {
+    console.error('Error fetching user favorites:', error)
+    throw error
+  }
+
+  const prompts = (data || []).map(fav => {
+    const prompt = formatPrompt(fav.prompts)
+    return {
+      ...prompt,
+      favoritedAt: fav.created_at,
+      favoritesCount: fav.prompts.favorites_count?.[0]?.count || 0
+    }
+  })
+
+  return {
+    prompts,
+    total: count || 0,
+    page,
+    limit,
+    totalPages: limit ? Math.ceil((count || 0) / limit) : 1,
+  }
+}
+
+/**
+ * Get favorites count for a prompt
+ */
+export async function getPromptFavoritesCount(promptId) {
+  const { count, error } = await supabase
+    .from('favorites')
+    .select('*', { count: 'exact', head: true })
+    .eq('prompt_id', promptId)
+
+  if (error) {
+    console.error('Error counting favorites:', error)
+    return 0
+  }
+
+  return count || 0
+}
+
+/**
+ * TEAM MEMBER REQUEST FUNCTIONS
+ */
+
+/**
+ * Submit a team member request
+ */
+export async function submitTeamMemberRequest(userId, { requestedCategoryId, message = '' }) {
+  if (!userId) {
+    throw new Error('User ID is required')
+  }
+
+  // Check if user already has a pending request
+  const { data: existing, error: checkError } = await supabase
+    .from('team_member_requests')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('status', 'pending')
+    .single()
+
+  if (checkError && checkError.code !== 'PGRST116') {
+    console.error('Error checking existing request:', checkError)
+    throw checkError
+  }
+
+  if (existing) {
+    throw new Error('You already have a pending team member request.')
+  }
+
+  const { data, error } = await supabase
+    .from('team_member_requests')
+    .insert({
+      user_id: userId,
+      requested_category_id: requestedCategoryId,
+      message: message.trim(),
+      status: 'pending',
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error submitting team member request:', error)
+    throw error
+  }
+
+  return data
+}
+
+/**
+ * Get team member requests (admin only)
+ */
+export async function getTeamMemberRequests({ status = 'pending' } = {}) {
+  let query = supabase
+    .from('team_member_requests')
+    .select(`
+      *,
+      users:user_id(email),
+      categories:requested_category_id(id, name)
+    `)
+    .order('created_at', { ascending: false })
+
+  if (status) {
+    query = query.eq('status', status)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching team member requests:', error)
+    throw error
+  }
+
+  return data || []
+}
+
+/**
+ * Approve a team member request and create admin profile
+ */
+export async function approveTeamMemberRequest(requestId, { assignedCategoryId = null } = {}) {
+  // First, get the request details
+  const { data: request, error: fetchError } = await supabase
+    .from('team_member_requests')
+    .select('*')
+    .eq('id', requestId)
+    .single()
+
+  if (fetchError) {
+    console.error('Error fetching team member request:', fetchError)
+    throw fetchError
+  }
+
+  if (!request || request.status !== 'pending') {
+    throw new Error('Request not found or already processed')
+  }
+
+  // Check if user already has admin profile
+  const { data: existingProfile, error: profileCheckError } = await supabase
+    .from('admin_profiles')
+    .select('id')
+    .eq('user_id', request.user_id)
+    .single()
+
+  if (profileCheckError && profileCheckError.code !== 'PGRST116') {
+    console.error('Error checking existing admin profile:', profileCheckError)
+    throw profileCheckError
+  }
+
+  if (existingProfile) {
+    throw new Error('User already has admin privileges')
+  }
+
+  // Create admin profile
+  const categoryId = assignedCategoryId || request.requested_category_id
+  const { error: createError } = await supabase
+    .from('admin_profiles')
+    .insert({
+      user_id: request.user_id,
+      role: 'category_admin',
+      assigned_category_id: categoryId,
+      display_name: '', // Will be set from user email
+    })
+
+  if (createError) {
+    console.error('Error creating admin profile:', createError)
+    throw createError
+  }
+
+  // Update request status
+  const { error: updateError } = await supabase
+    .from('team_member_requests')
+    .update({ 
+      status: 'approved',
+      processed_at: new Date().toISOString()
+    })
+    .eq('id', requestId)
+
+  if (updateError) {
+    console.error('Error updating request status:', updateError)
+    throw updateError
+  }
+
+  return true
+}
+
+/**
+ * Reject a team member request
+ */
+export async function rejectTeamMemberRequest(requestId, reason = '') {
+  const { error } = await supabase
+    .from('team_member_requests')
+    .update({ 
+      status: 'rejected',
+      rejection_reason: reason.trim(),
+      processed_at: new Date().toISOString()
+    })
+    .eq('id', requestId)
+
+  if (error) {
+    console.error('Error rejecting team member request:', error)
+    throw error
+  }
+
+  return true
+}
+
+/**
+ * VIDEO CONTENT FUNCTIONS
+ */
+
+/**
+ * Extract YouTube video ID from URL
+ */
+export function extractYouTubeId(url) {
+  if (!url) return null
+  
+  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/
+  const match = url.match(regex)
+  return match ? match[1] : null
+}
+
+/**
+ * Validate video URL (Google Drive or YouTube)
+ */
+export function validateVideoUrl(url) {
+  if (!url) return { valid: false, error: 'URL is required' }
+  
+  try {
+    const urlObj = new URL(url)
+    
+    // Check for YouTube
+    if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+      const videoId = extractYouTubeId(url)
+      if (!videoId) {
+        return { valid: false, error: 'Invalid YouTube URL format' }
+      }
+      return { valid: true, type: 'youtube', videoId }
+    }
+    
+    // Check for Google Drive
+    if (urlObj.hostname.includes('drive.google.com')) {
+      // Basic Google Drive validation
+      if (url.includes('/file/d/') || url.includes('id=')) {
+        return { valid: true, type: 'google_drive' }
+      }
+      return { valid: false, error: 'Invalid Google Drive share URL format' }
+    }
+    
+    return { valid: false, error: 'Only YouTube and Google Drive video links are supported' }
+  } catch (e) {
+    return { valid: false, error: 'Invalid URL format' }
+  }
+}
+
+/**
+ * Format video URL for embedding
+ */
+export function formatVideoUrlForEmbed(url) {
+  const validation = validateVideoUrl(url)
+  if (!validation.valid) return null
+  
+  if (validation.type === 'youtube') {
+    return `https://www.youtube.com/embed/${validation.videoId}`
+  }
+  
+  if (validation.type === 'google_drive') {
+    // Extract Google Drive file ID and format for embed
+    let fileId = null
+    if (url.includes('/file/d/')) {
+      fileId = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/)?.[1]
+    } else if (url.includes('id=')) {
+      fileId = url.match(/id=([a-zA-Z0-9-_]+)/)?.[1]
+    }
+    
+    if (fileId) {
+      return `https://drive.google.com/file/d/${fileId}/preview`
+    }
+  }
+  
+  return null
 }

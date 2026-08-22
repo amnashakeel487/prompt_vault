@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Search, Loader2 } from 'lucide-react'
+import { Search, Loader2, SlidersHorizontal } from 'lucide-react'
 import SEO from '../components/SEO'
 import PromptCard from '../components/PromptCard'
 import EmptyState from '../components/EmptyState'
@@ -10,24 +10,34 @@ import { getPrompts } from '../services/promptService'
 export default function SearchResults() {
   const [params, setParams] = useSearchParams()
   const initialQ = params.get('q') || ''
+  const initialSort = params.get('sort') || 'created_at'
   const [query, setQuery] = useState(initialQ)
+  const [sortBy, setSortBy] = useState(initialSort)
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     setQuery(initialQ)
-  }, [initialQ])
+    setSortBy(initialSort)
+  }, [initialQ, initialSort])
 
   // Debounced URL param update and search execution
   useEffect(() => {
     const t = setTimeout(async () => {
       if (query.trim()) {
-        setParams({ q: query.trim() })
+        const newParams = { q: query.trim() }
+        if (sortBy !== 'created_at') {
+          newParams.sort = sortBy
+        }
+        setParams(newParams)
+        
         try {
           setLoading(true)
           const res = await getPrompts({
             search: query.trim(),
             status: 'published',
+            sort: sortBy,
+            order: 'desc',
             limit: 30,
           })
           setResults(res.prompts)
@@ -44,7 +54,11 @@ export default function SearchResults() {
     }, 300)
 
     return () => clearTimeout(t)
-  }, [query]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query, sortBy]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleSortChange(newSort) {
+    setSortBy(newSort)
+  }
 
   return (
     <section className="section-pad py-8 sm:py-14">
@@ -64,6 +78,36 @@ export default function SearchResults() {
           <Loader2 size={16} className="absolute right-3.5 sm:right-4 top-1/2 -translate-y-1/2 animate-spin text-violet-soft" />
         )}
       </div>
+
+      {/* Sort Controls */}
+      {query.trim() && (
+        <div className="mt-4 sm:mt-6 flex items-center gap-3">
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-ink-muted">
+            <SlidersHorizontal size={14} />
+            <span>Sort by:</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: 'created_at', label: 'Latest' },
+              { value: 'favorites', label: 'Most Favorited' },
+              { value: 'copies', label: 'Most Copied' },
+              { value: 'views', label: 'Most Viewed' },
+            ].map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => handleSortChange(value)}
+                className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                  sortBy === value
+                    ? 'bg-violet/20 text-violet-soft border border-violet/30'
+                    : 'bg-white/[0.03] text-ink-muted border border-line hover:bg-white/[0.06] hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 sm:mt-10">
         {!query.trim() ? (

@@ -15,6 +15,7 @@ import {
   X,
   ExternalLink,
   User,
+  UserPlus,
   Key,
   ShieldCheck,
   Search,
@@ -85,6 +86,9 @@ import {
   updateAdminProfile,
   deleteAdminProfile,
   getPromptImages,
+  getTeamMemberRequests,
+  approveTeamMemberRequest,
+  rejectTeamMemberRequest,
 } from '../services/promptService'
 import { uploadImageToGitHub } from '../services/githubUpload'
 import { formatGoogleDriveImageUrl, extractGoogleDriveId, detectImageSource } from '../utils/googleDrive'
@@ -130,12 +134,12 @@ export default function AdminDashboard() {
     )
   }
 
-  const [activeTab, setActiveTab] = useState('prompts') // 'prompts' | 'pending' | 'categories' | 'admins' | 'messages' | 'analytics' | 'profile'
+  const [activeTab, setActiveTab] = useState('prompts') // 'prompts' | 'pending' | 'categories' | 'admins' | 'teamRequests' | 'messages' | 'analytics' | 'profile'
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Redirect category admins away from super admin only tabs
   useEffect(() => {
-    if (!isSuperAdmin && (activeTab === 'messages' || activeTab === 'pending' || activeTab === 'categories' || activeTab === 'admins')) {
+    if (!isSuperAdmin && (activeTab === 'messages' || activeTab === 'pending' || activeTab === 'categories' || activeTab === 'admins' || activeTab === 'teamRequests')) {
       setActiveTab('prompts')
     }
   }, [isSuperAdmin, activeTab])
@@ -147,6 +151,7 @@ export default function AdminDashboard() {
   const [subcategoriesList, setSubcategoriesList] = useState([])
   const [messagesList, setMessagesList] = useState([])
   const [adminsList, setAdminsList] = useState([])
+  const [teamRequestsList, setTeamRequestsList] = useState([])
   const [stats, setStats] = useState({
     totalPrompts: 0,
     totalCategories: 0,
@@ -187,6 +192,8 @@ export default function AdminDashboard() {
     trending: false,
     status: 'published',
     rejectionReason: '',
+    contentType: 'prompt',
+    videoUrl: '',
   })
 
   // Multi-Image Form Tab & Inputs
@@ -232,10 +239,6 @@ export default function AdminDashboard() {
   const [newSubcatName, setNewSubcatName] = useState('')
   const [subcatParentId, setSubcatParentId] = useState('')
 
-  // Upload States
-  const [uploadingImage, setUploadingImage] = useState(false)
-  const [uploadError, setUploadError] = useState('')
-
   // Profile Form States
   const [newEmail, setNewEmail] = useState(user?.email || '')
   const [emailUpdating, setEmailUpdating] = useState(false)
@@ -264,13 +267,14 @@ export default function AdminDashboard() {
       setLoading(true)
       const userProfile = profile || { role, assigned_category_id: assignedCategoryId }
 
-      const [prompts, cats, adminStats, messages, pending, admins] = await Promise.all([
+      const [prompts, cats, adminStats, messages, pending, admins, teamRequests] = await Promise.all([
         getAdminPrompts(userProfile).catch(() => []),
         getCategories().catch(() => []),
         getAdminStats(userProfile).catch(() => ({ totalPrompts: 0, totalCategories: 0, totalViews: 0, totalCopies: 0, pendingCount: 0 })),
         isSuperAdmin ? getContactMessages().catch(() => []) : Promise.resolve([]),
         isSuperAdmin ? getPendingPrompts().catch(() => []) : Promise.resolve([]),
         isSuperAdmin ? getAdminProfiles().catch(() => []) : Promise.resolve([]),
+        isSuperAdmin ? getTeamMemberRequests({ status: 'pending' }).catch(() => []) : Promise.resolve([]),
       ])
 
       setPromptsList(prompts || [])
@@ -281,6 +285,7 @@ export default function AdminDashboard() {
         setMessagesList(messages || [])
         setPendingList(pending || [])
         setAdminsList(admins || [])
+        setTeamRequestsList(teamRequests || [])
       }
       
       setDataLoaded(true)
@@ -346,6 +351,8 @@ export default function AdminDashboard() {
       trending: false,
       status: isCategoryAdmin ? 'pending' : 'published',
       rejectionReason: '',
+      contentType: 'prompt',
+      videoUrl: '',
     })
     setDriveUrlInput('')
     setDirectUrlInput('')
@@ -382,6 +389,8 @@ export default function AdminDashboard() {
       trending: Boolean(p.trending),
       status: p.status || 'published',
       rejectionReason: p.rejectionReason || p.rejection_reason || '',
+      contentType: p.contentType || p.content_type || 'prompt',
+      videoUrl: p.videoUrl || p.video_url || '',
     })
     setDriveUrlInput('')
     setDirectUrlInput('')
@@ -781,6 +790,29 @@ export default function AdminDashboard() {
     }
   }
 
+  // --- TEAM MEMBER REQUEST HANDLERS ---
+  async function handleApproveTeamRequest(requestId, userEmail, categoryId = null) {
+    try {
+      await approveTeamMemberRequest(requestId, { assignedCategoryId: categoryId })
+      notify('success', `Team member request approved! ${userEmail} is now a category admin.`)
+      await loadData()
+    } catch (err) {
+      console.error('Error approving team request:', err)
+      notify('error', err.message || 'Failed to approve team member request.')
+    }
+  }
+
+  async function handleRejectTeamRequest(requestId, userEmail, reason = '') {
+    try {
+      await rejectTeamMemberRequest(requestId, reason)
+      notify('success', `Team member request from ${userEmail} has been rejected.`)
+      await loadData()
+    } catch (err) {
+      console.error('Error rejecting team request:', err)
+      notify('error', 'Failed to reject team member request.')
+    }
+  }
+
   // Filtered prompts list
   const filteredPrompts = promptsList.filter((p) => {
     const matchesSearch =
@@ -929,6 +961,21 @@ export default function AdminDashboard() {
               />
             )}
 
+            {/* Team Requests (Super Admin only) */}
+            {isSuperAdmin && (
+              <SidebarLink
+                active={activeTab === 'teamRequests'}
+                onClick={() => {
+                  setActiveTab('teamRequests')
+                  setSidebarOpen(false)
+                }}
+                icon={UserPlus}
+                label="Team Requests"
+                badge={teamRequestsList.length > 0 ? `${teamRequestsList.length} pending` : 0}
+                badgeColor="amber"
+              />
+            )}
+
             {/* Contact Inbox (Super Admin only) */}
             {isSuperAdmin && (
               <SidebarLink
@@ -1032,6 +1079,7 @@ export default function AdminDashboard() {
                 {activeTab === 'pending' && 'Pending Review Queue'}
                 {activeTab === 'categories' && 'Categories & Tags'}
                 {activeTab === 'admins' && 'Admin Team Management'}
+                {activeTab === 'teamRequests' && 'Team Member Requests'}
                 {activeTab === 'messages' && 'Contact Inbox'}
                 {activeTab === 'analytics' && 'Vault Analytics'}
                 {activeTab === 'profile' && 'Account & Security'}
@@ -1533,6 +1581,103 @@ export default function AdminDashboard() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------------ */}
+        {/* TAB 4.5: TEAM MEMBER REQUESTS (Super Admin Only)                  */}
+        {/* ------------------------------------------------------------------ */}
+        {activeTab === 'teamRequests' && isSuperAdmin && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-lg text-white">
+                  Team Member Requests ({teamRequestsList.length})
+                </h2>
+                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                  Review and approve requests from users who want to become team members.
+                </p>
+              </div>
+            </div>
+
+            {teamRequestsList.length === 0 ? (
+              <div className="glass-card p-12 text-center space-y-2">
+                <UserPlus size={32} className="text-ink-faint mx-auto" />
+                <p style={{ color: '#FFFFFF' }} className="font-display text-sm font-semibold text-white">
+                  No pending requests
+                </p>
+                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                  When users submit team member requests, they'll appear here for review.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {teamRequestsList.map((request) => (
+                  <div key={request.id} className="glass-card p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="h-8 w-8 rounded-full bg-violet/20 flex items-center justify-center">
+                            <User size={14} className="text-violet-soft" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-white text-sm">
+                              {request.users?.email || 'Unknown User'}
+                            </p>
+                            <p className="text-xs text-ink-faint">
+                              {new Date(request.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {request.categories && (
+                          <div className="mb-2">
+                            <span className="text-xs text-ink-muted">Requested Category: </span>
+                            <span className="chip !text-xs !py-1">
+                              {request.categories.name}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {request.message && (
+                          <div className="mb-3">
+                            <p className="text-xs text-ink-muted mb-1">Message:</p>
+                            <p className="text-sm text-ink-muted bg-white/[0.02] rounded-lg p-2 border border-line">
+                              {request.message}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleApproveTeamRequest(
+                            request.id, 
+                            request.users?.email,
+                            request.requested_category_id
+                          )}
+                          className="btn-primary !py-2 !px-3 !text-xs"
+                        >
+                          <CheckCircle size={14} />
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleRejectTeamRequest(
+                            request.id, 
+                            request.users?.email,
+                            'Request rejected by admin'
+                          )}
+                          className="btn-ghost !py-2 !px-3 !text-xs !text-red-400 !border-red-500/30 hover:!bg-red-500/10"
+                        >
+                          <XCircle size={14} />
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

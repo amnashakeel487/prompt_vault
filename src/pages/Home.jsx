@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Sparkles } from 'lucide-react'
+import { ArrowRight, Sparkles, Heart } from 'lucide-react'
 import SEO from '../components/SEO'
 import HeroTerminal from '../components/HeroTerminal'
 import TrustedBy from '../components/TrustedBy'
@@ -16,6 +16,12 @@ export default function Home() {
   const { categories, loading: loadingCats } = useCategories()
   const { prompts: featured, loading: loadingFeatured } = usePrompts({
     featured: true,
+    limit: 6,
+    status: 'published',
+  })
+  const { prompts: mostFavorited, loading: loadingFavorited } = usePrompts({
+    sort: 'favorites',
+    order: 'desc',
     limit: 6,
     status: 'published',
   })
@@ -135,6 +141,31 @@ export default function Home() {
               <div key={p.id} className="min-w-[260px] sm:min-w-[300px] max-w-[280px] sm:max-w-[300px] snap-start shrink-0">
                 <PromptCard prompt={p} index={i} />
               </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Most Loved Prompts */}
+      <section className="section-pad py-12 sm:py-16">
+        <div className="mb-6 sm:mb-8 flex items-end justify-between">
+          <div>
+            <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink flex items-center gap-2">
+              <Heart size={24} className="text-red-400" />
+              Most loved prompts
+            </h2>
+            <p className="mt-1 text-xs sm:text-sm text-ink-muted">Community favorites with the most hearts.</p>
+          </div>
+          <Link to="/search?sort=favorites" className="hidden sm:flex items-center gap-1 text-sm text-violet-soft hover:text-white">
+            View all <ArrowRight size={14} />
+          </Link>
+        </div>
+        {loadingFavorited ? (
+          <GridSkeleton count={6} />
+        ) : (
+          <div className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {mostFavorited.map((p, i) => (
+              <PromptCard key={p.id} prompt={p} index={i} />
             ))}
           </div>
         )}

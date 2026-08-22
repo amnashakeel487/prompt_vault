@@ -8,6 +8,8 @@ import CopyButton from '../components/CopyButton'
 import VariableForm from '../components/VariableForm'
 import PromptCard from '../components/PromptCard'
 import EmptyState from '../components/EmptyState'
+import FavoriteButton from '../components/FavoriteButton'
+import PublicAuthModal from '../components/PublicAuthModal'
 import { usePromptBySlug } from '../hooks/usePromptBySlug'
 import { incrementPromptCopies } from '../services/promptService'
 import {
@@ -25,6 +27,7 @@ export default function PromptDetails() {
   const [localCopyCount, setLocalCopyCount] = useState(null)
   const [toast, setToast] = useState(false)
   const [activeImageIndex, setActiveImageIndex] = useState(0)
+  const [showAuthModal, setShowAuthModal] = useState(false)
 
   const copyCount = localCopyCount !== null ? localCopyCount : prompt?.copies ?? 0
 
@@ -178,6 +181,13 @@ export default function PromptDetails() {
               <span className="flex items-center gap-1.5"><Eye size={13} /> {(prompt.views || 0).toLocaleString()} views</span>
               <span className="flex items-center gap-1.5"><Copy size={13} /> {copyCount.toLocaleString()} copies</span>
               <span className="flex items-center gap-1.5"><Clock size={13} /> {readingTime(prompt.prompt)} min read</span>
+              <div className="ml-auto">
+                <FavoriteButton 
+                  promptId={prompt.id} 
+                  initialFavorited={false} 
+                  showAuthModal={() => setShowAuthModal(true)} 
+                />
+              </div>
             </div>
 
             {prompt.tags && prompt.tags.length > 0 && (
@@ -326,6 +336,11 @@ export default function PromptDetails() {
           Copied successfully
         </div>
       </motion.div>
+
+      <PublicAuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </section>
   )
 }

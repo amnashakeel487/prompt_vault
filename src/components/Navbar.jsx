@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Zap, Search, Menu, X } from 'lucide-react'
+import { Zap, Search, Menu, X, Sun, Moon, User, LogOut } from 'lucide-react'
+import { usePublicAuth } from '../context/PublicAuthContext'
+import PublicAuthModal from './PublicAuthModal'
 
 // Each nav item: `to` is the fallback page route, `hash` is the section id on Home
 const links = [
@@ -24,10 +26,28 @@ function scrollToSection(hash) {
 export default function Navbar() {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') || 'dark'
+    }
+    return 'dark'
+  })
   const navigate = useNavigate()
   const location = useLocation()
+  const { user, signOut } = usePublicAuth()
 
   const isHome = location.pathname === '/'
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  function toggleTheme() {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark')
+  }
 
   function submitSearch(e) {
     e.preventDefault()
@@ -83,6 +103,46 @@ export default function Navbar() {
             />
           </form>
 
+          {/* Right side controls */}
+          <div className="flex items-center gap-2">
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:text-white hover:bg-white/[0.05] transition-colors"
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+
+            {/* User Menu */}
+            {user ? (
+              <div className="hidden md:flex items-center gap-2">
+                <Link
+                  to="/account"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-ink-muted hover:text-white hover:bg-white/[0.05] transition-colors"
+                >
+                  <User size={16} />
+                  Account
+                </Link>
+                <button
+                  onClick={signOut}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-ink-muted hover:text-white hover:bg-white/[0.05] transition-colors"
+                >
+                  <LogOut size={16} />
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-violet/20 hover:bg-violet/30 border border-violet/30 transition-colors"
+              >
+                <User size={16} />
+                Sign In
+              </button>
+            )}
+          </div>
+
           {/* Mobile hamburger button with min 44x44px touch target */}
           <button
             className="md:hidden flex h-11 w-11 items-center justify-center rounded-lg text-ink transition-colors hover:bg-white/[0.05]"
@@ -113,6 +173,52 @@ export default function Navbar() {
                   className="w-full rounded-lg border border-line bg-white/[0.04] py-2.5 pl-10 pr-3.5 text-sm text-ink placeholder:text-ink-faint outline-none focus:border-violet/50"
                 />
               </form>
+
+              {/* Mobile Theme Toggle & Auth */}
+              <div className="flex items-center justify-between pt-2 border-t border-line/30">
+                <button
+                  onClick={toggleTheme}
+                  className="flex items-center gap-2 py-2.5 text-sm text-ink-muted hover:text-white"
+                >
+                  {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                  {theme === 'dark' ? 'Light' : 'Dark'} theme
+                </button>
+
+                {user ? (
+                  <div className="flex items-center gap-3">
+                    <Link
+                      to="/account"
+                      onClick={() => setOpen(false)}
+                      className="flex items-center gap-2 py-2.5 text-sm text-ink-muted hover:text-white"
+                    >
+                      <User size={16} />
+                      Account
+                    </Link>
+                    <button
+                      onClick={() => {
+                        signOut()
+                        setOpen(false)
+                      }}
+                      className="flex items-center gap-2 py-2.5 text-sm text-ink-muted hover:text-white"
+                    >
+                      <LogOut size={16} />
+                      Sign Out
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setShowAuthModal(true)
+                      setOpen(false)
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-violet/20 border border-violet/30"
+                  >
+                    <User size={16} />
+                    Sign In
+                  </button>
+                )}
+              </div>
+
               <div className="flex flex-col divide-y divide-line/30 pt-1">
                 {links.map((l) => (
                   <a
@@ -129,6 +235,11 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <PublicAuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </header>
   )
 }

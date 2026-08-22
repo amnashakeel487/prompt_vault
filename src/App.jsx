@@ -5,6 +5,7 @@ import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './context/AuthContext'
+import { PublicAuthProvider } from './context/PublicAuthContext'
 
 // Lazy-loaded route chunks for performance
 const Home = lazy(() => import('./pages/Home'))
@@ -16,6 +17,7 @@ const Latest = lazy(() => import('./pages/Latest'))
 const Popular = lazy(() => import('./pages/Popular'))
 const AdminLogin = lazy(() => import('./pages/AdminLogin'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const UserAccount = lazy(() => import('./pages/UserAccount'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 const Privacy = lazy(() => import('./pages/Privacy'))
 const Terms = lazy(() => import('./pages/Terms'))
@@ -48,38 +50,41 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <div className="flex min-h-screen flex-col bg-base">
-        {!isAdminRoute && <Navbar />}
-        <main className="flex-1">
-          <Suspense fallback={<RouteFallback />}>
-            <AnimatePresence mode="wait">
-              <Routes location={location} key={location.pathname}>
-                <Route path="/" element={<PageTransition><Home /></PageTransition>} />
-                <Route path="/categories" element={<PageTransition><Categories /></PageTransition>} />
-                <Route path="/category/:slug" element={<PageTransition><CategoryDetail /></PageTransition>} />
-                <Route path="/prompt/:slug" element={<PageTransition><PromptDetails /></PageTransition>} />
-                <Route path="/search" element={<PageTransition><SearchResults /></PageTransition>} />
-                <Route path="/latest" element={<PageTransition><Latest /></PageTransition>} />
-                <Route path="/popular" element={<PageTransition><Popular /></PageTransition>} />
-                <Route path="/admin/login" element={<PageTransition><AdminLogin /></PageTransition>} />
-                <Route
-                  path="/admin/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <PageTransition><AdminDashboard /></PageTransition>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
-                <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
-                <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
-                <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
-              </Routes>
-            </AnimatePresence>
-          </Suspense>
-        </main>
-        {!isAdminRoute && <Footer />}
-      </div>
+      <PublicAuthProvider>
+        <div className="flex min-h-screen flex-col bg-base">
+          {!isAdminRoute && <Navbar />}
+          <main className="flex-1">
+            <Suspense fallback={<RouteFallback />}>
+              <AnimatePresence mode="wait">
+                <Routes location={location} key={location.pathname}>
+                  <Route path="/" element={<PageTransition><Home /></PageTransition>} />
+                  <Route path="/categories" element={<PageTransition><Categories /></PageTransition>} />
+                  <Route path="/category/:slug" element={<PageTransition><CategoryDetail /></PageTransition>} />
+                  <Route path="/prompt/:slug" element={<PageTransition><PromptDetails /></PageTransition>} />
+                  <Route path="/search" element={<PageTransition><SearchResults /></PageTransition>} />
+                  <Route path="/latest" element={<PageTransition><Latest /></PageTransition>} />
+                  <Route path="/popular" element={<PageTransition><Popular /></PageTransition>} />
+                  <Route path="/account" element={<PageTransition><UserAccount /></PageTransition>} />
+                  <Route path="/admin/login" element={<PageTransition><AdminLogin /></PageTransition>} />
+                  <Route
+                    path="/admin/dashboard"
+                    element={
+                      <ProtectedRoute>
+                        <PageTransition><AdminDashboard /></PageTransition>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
+                  <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
+                  <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
+                  <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
+                </Routes>
+              </AnimatePresence>
+            </Suspense>
+          </main>
+          {!isAdminRoute && <Footer />}
+        </div>
+      </PublicAuthProvider>
     </AuthProvider>
   )
 }
