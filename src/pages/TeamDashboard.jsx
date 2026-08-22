@@ -236,13 +236,27 @@ export default function TeamDashboard() {
       // Load user's prompts (only for their assigned category and authored by them)
       const { data: promptsData, error: promptsError } = await supabase
         .from('prompts')
-        .select('*')
+        .select(`
+          *,
+          prompt_images (
+            id,
+            image_url,
+            source,
+            sort_order,
+            is_featured
+          )
+        `)
         .eq('author', user.id)
         .eq('category_id', assignedCategoryId)
         .order('created_at', { ascending: false })
 
       if (promptsError) throw promptsError
-      const userPrompts = promptsData || []
+      
+      // Transform the data to match the expected format
+      const userPrompts = (promptsData || []).map(prompt => ({
+        ...prompt,
+        images: prompt.prompt_images || []
+      }))
       setPrompts(userPrompts)
 
       // Calculate stats
@@ -331,24 +345,43 @@ export default function TeamDashboard() {
         status: 'pending', // Team members always submit for review
         featured_image: featuredImage,
         output_image: formData.outputImage || null,
-        images: formData.images || [],
         seo_title: formData.seoTitle || formData.title,
         seo_description: formData.seoDescription || formData.description,
         featured: false, // Team members can't mark as featured
         popular: false,
         trending: false,
-        content_type: formData.contentType || 'prompt',
-        video_url: formData.videoUrl || null,
         views: 0,
         copies: 0,
         created_at: new Date().toISOString()
       }
 
-      const { error: insertError } = await supabase
+      const { data: insertedPrompt, error: insertError } = await supabase
         .from('prompts')
         .insert([promptData])
+        .select('id')
+        .single()
 
       if (insertError) throw insertError
+
+      // Insert images into prompt_images table if there are any
+      if (formData.images.length > 0) {
+        const imageInserts = formData.images.map((img, index) => ({
+          prompt_id: insertedPrompt.id,
+          image_url: img.imageUrl,
+          source: img.source || 'direct',
+          sort_order: index,
+          is_featured: img.isFeatured || false
+        }))
+
+        const { error: imagesError } = await supabase
+          .from('prompt_images')
+          .insert(imageInserts)
+
+        if (imagesError) {
+          console.warn('Failed to insert images:', imagesError)
+          // Don't fail the whole operation if images fail
+        }
+      }
 
       setSuccess('Prompt submitted for Super Admin review!')
       setShowAddForm(false)
@@ -406,11 +439,8 @@ export default function TeamDashboard() {
         status: 'pending', // Reset to pending when edited
         featured_image: featuredImage,
         output_image: formData.outputImage || null,
-        images: formData.images || [],
         seo_title: formData.seoTitle || formData.title,
         seo_description: formData.seoDescription || formData.description,
-        content_type: formData.contentType || 'prompt',
-        video_url: formData.videoUrl || null,
         updated_at: new Date().toISOString()
       }
 
@@ -421,6 +451,39 @@ export default function TeamDashboard() {
         .eq('author', user.id) // Extra security check
 
       if (updateError) throw updateError
+
+      // Update images in prompt_images table
+      if (formData.images.length > 0) {
+        // Delete existing images for this prompt
+        await supabase
+          .from('prompt_images')
+          .delete()
+          .eq('prompt_id', editingPrompt.id)
+
+        // Insert new images
+        const imageInserts = formData.images.map((img, index) => ({
+          prompt_id: editingPrompt.id,
+          image_url: img.imageUrl,
+          source: img.source || 'direct',
+          sort_order: index,
+          is_featured: img.isFeatured || false
+        }))
+
+        const { error: imagesError } = await supabase
+          .from('prompt_images')
+          .insert(imageInserts)
+
+        if (imagesError) {
+          console.warn('Failed to update images:', imagesError)
+          // Don't fail the whole operation if images fail
+        }
+      } else {
+        // If no images, remove all existing images
+        await supabase
+          .from('prompt_images')
+          .delete()
+          .eq('prompt_id', editingPrompt.id)
+      }
 
       setSuccess('Prompt updated and resubmitted for review!')
       setEditingPrompt(null)
@@ -477,7 +540,12 @@ export default function TeamDashboard() {
       prompt: prompt.prompt,
       featuredImage: prompt.featured_image || '',
       outputImage: prompt.output_image || '',
-      images: prompt.images || [],
+      images: (prompt.images || []).map(img => ({
+        imageUrl: img.image_url,
+        source: img.source,
+        isFeatured: img.is_featured,
+        sortOrder: img.sort_order
+      })),
       seoTitle: prompt.seo_title || '',
       seoDescription: prompt.seo_description || '',
       featured: prompt.featured || false,
@@ -485,8 +553,8 @@ export default function TeamDashboard() {
       trending: prompt.trending || false,
       status: prompt.status || 'pending_review',
       rejectionReason: prompt.rejection_reason || '',
-      contentType: prompt.content_type || 'prompt',
-      videoUrl: prompt.video_url || '',
+      contentType: 'prompt', // Default for team members
+      videoUrl: '',
     })
     setEditingPrompt(prompt)
     setShowAddForm(true)
