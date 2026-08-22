@@ -122,20 +122,9 @@ export default function AdminDashboard() {
     loading: authLoading,
   } = useAuth()
 
-  // Early return if auth is still loading to prevent rendering before user data is available
-  if (authLoading || !user?.id) {
-    return (
-      <div className="min-h-screen bg-base text-ink flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet border-t-transparent" />
-          <p className="text-xs text-ink-muted">Loading dashboard...</p>
-        </div>
-      </div>
-    )
-  }
-
   const [activeTab, setActiveTab] = useState('prompts') // 'prompts' | 'pending' | 'categories' | 'admins' | 'teamRequests' | 'messages' | 'analytics' | 'profile'
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const isFetchingRef = useRef(false)
 
   // Redirect category admins away from super admin only tabs
   useEffect(() => {
@@ -162,7 +151,6 @@ export default function AdminDashboard() {
 
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [dataLoaded, setDataLoaded] = useState(false)
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' })
 
   // Filters
@@ -246,31 +234,39 @@ export default function AdminDashboard() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordUpdating, setPasswordUpdating] = useState(false)
 
+  useEffect(() => {
+    if (user?.email) {
+      setNewEmail(user.email)
+    }
+  }, [user?.email])
+
   // Assigned Category details (for category_admin)
   const assignedCategory = useMemo(() => {
     if (!assignedCategoryId || !categoriesList.length) return null
     return categoriesList.find((c) => c.id === assignedCategoryId)
   }, [assignedCategoryId, categoriesList])
 
-  useEffect(() => {
-    // Only load data when we have a stable user and profile, and haven't loaded yet
-    if (user?.id && profile?.role && !dataLoaded && !loading && !refreshing) {
-      loadData()
-    }
-  }, [user?.id, profile?.role, dataLoaded, loading, refreshing, loadData])
-
   const loadData = useCallback(async () => {
-    // Prevent multiple concurrent loading operations
-    if (loading || refreshing) return
-    
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
+    setLoading(true)
+
     try {
-      setLoading(true)
       const userProfile = profile || { role, assigned_category_id: assignedCategoryId }
 
       const [prompts, cats, adminStats, messages, pending, admins, teamRequests] = await Promise.all([
-        getAdminPrompts(userProfile).catch(() => []),
-        getCategories().catch(() => []),
-        getAdminStats(userProfile).catch(() => ({ totalPrompts: 0, totalCategories: 0, totalViews: 0, totalCopies: 0, pendingCount: 0 })),
+        getAdminPrompts(userProfile).catch((err) => {
+          console.warn('Failed to load prompts:', err)
+          return []
+        }),
+        getCategories().catch((err) => {
+          console.warn('Failed to load categories:', err)
+          return []
+        }),
+        getAdminStats(userProfile).catch((err) => {
+          console.warn('Failed to load stats:', err)
+          return { totalPrompts: 0, totalCategories: 0, totalViews: 0, totalCopies: 0, pendingCount: 0 }
+        }),
         isSuperAdmin ? getContactMessages().catch(() => []) : Promise.resolve([]),
         isSuperAdmin ? getPendingPrompts().catch(() => []) : Promise.resolve([]),
         isSuperAdmin ? getAdminProfiles().catch(() => []) : Promise.resolve([]),
@@ -287,18 +283,22 @@ export default function AdminDashboard() {
         setAdminsList(admins || [])
         setTeamRequestsList(teamRequests || [])
       }
-      
-      setDataLoaded(true)
     } catch (err) {
       console.error('Error loading dashboard data:', err)
     } finally {
       setLoading(false)
+      isFetchingRef.current = false
     }
-  }, [profile, role, assignedCategoryId, isSuperAdmin, loading, refreshing])
+  }, [profile, role, assignedCategoryId, isSuperAdmin])
+
+  useEffect(() => {
+    if (user?.id) {
+      loadData()
+    }
+  }, [user?.id, profile?.role, loadData])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
-    setDataLoaded(false) // Reset dataLoaded to allow reloading
     await loadData()
     setRefreshing(false)
     notify('success', 'Dashboard data refreshed.')
@@ -814,25 +814,45 @@ export default function AdminDashboard() {
   }
 
   // Filtered prompts list
-  const filteredPrompts = promptsList.filter((p) => {
-    const matchesSearch =
-      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (Array.isArray(p.tags) && p.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase())))
+  const filteredPrompts = useMemo(() => {
+    const q = (searchQuery || '').toLowerCase().trim()
+    return (promptsList || []).filter((p) => {
+      if (!p) return false
+      const title = (p.title || '').toLowerCase()
+      const desc = (p.description || '').toLowerCase()
+      const tags = Array.isArray(p.tags) ? p.tags : []
 
-    const matchesStatus =
-      statusFilter === 'all' || p.status === statusFilter
+      const matchesSearch =
+        !q ||
+        title.includes(q) ||
+        desc.includes(q) ||
+        tags.some((t) => typeof t === 'string' && t.toLowerCase().includes(q))
 
-    const matchesCat =
-      categoryFilter === 'all' ||
-      p.categoryId === categoryFilter ||
-      p.category_id === categoryFilter
+      const matchesStatus =
+        statusFilter === 'all' || p.status === statusFilter
 
-    return matchesSearch && matchesStatus && matchesCat
-  })
+      const matchesCat =
+        categoryFilter === 'all' ||
+        p.categoryId === categoryFilter ||
+        p.category_id === categoryFilter
 
-  const unreadMessagesCount = isSuperAdmin ? messagesList.filter((m) => !m.read).length : 0
-  const pendingReviewCount = isSuperAdmin ? pendingList.length : 0
+      return matchesSearch && matchesStatus && matchesCat
+    })
+  }, [promptsList, searchQuery, statusFilter, categoryFilter])
+
+  const unreadMessagesCount = isSuperAdmin ? (messagesList || []).filter((m) => !m.read).length : 0
+  const pendingReviewCount = isSuperAdmin ? (pendingList || []).length : 0
+
+  if (authLoading || !user?.id) {
+    return (
+      <div className="min-h-screen bg-base text-ink flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet border-t-transparent" />
+          <p className="text-xs text-ink-muted">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-base text-ink flex flex-col md:flex-row">

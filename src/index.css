@@ -177,6 +177,47 @@
     background: linear-gradient(90deg, transparent, rgba(0,0,0,0.06), transparent);
   }
 
+  /* Form element styling for theme compatibility */
+  select, input, textarea {
+    background-color: rgba(255, 255, 255, 0.03);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+  }
+  
+  [data-theme="light"] select,
+  [data-theme="light"] input,
+  [data-theme="light"] textarea {
+    background-color: rgba(255, 255, 255, 0.9);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+  }
+
+  /* Select dropdown options */
+  select option {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    padding: 8px 12px;
+  }
+
+  [data-theme="light"] select option {
+    background-color: #FFFFFF;
+    color: var(--color-ink);
+  }
+
+  /* Ensure dropdown arrow is visible */
+  select {
+    background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'><path fill='%23A09ABF' d='M2 0L0 2h4zm0 5L0 3h4z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px;
+    appearance: none;
+    padding-right: 40px;
+  }
+
+  [data-theme="light"] select {
+    background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'><path fill='%236B7280' d='M2 0L0 2h4zm0 5L0 3h4z'/></svg>");
+  }
+
   /* Background utilities */
   .bg-grid-glow {
     background-image: var(--bg-grid-glow);

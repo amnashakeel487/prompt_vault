@@ -196,7 +196,7 @@ export default function UserAccount() {
                       <select
                         value={requestForm.categoryId}
                         onChange={(e) => setRequestForm(prev => ({ ...prev, categoryId: e.target.value }))}
-                        className="w-full rounded-xl border border-line bg-surface/50 px-4 py-3 text-white focus:border-violet focus:outline-none"
+                        className="w-full rounded-xl border border-line px-4 py-3 focus:border-violet focus:outline-none bg-white/[0.03] text-ink"
                       >
                         <option value="">Any Category</option>
                         {categories.map(cat => (
@@ -214,7 +214,7 @@ export default function UserAccount() {
                         onChange={(e) => setRequestForm(prev => ({ ...prev, message: e.target.value }))}
                         placeholder="Tell us about your experience or why you'd like to contribute..."
                         rows={3}
-                        className="w-full rounded-xl border border-line bg-surface/50 px-4 py-3 text-white placeholder:text-ink-faint focus:border-violet focus:outline-none resize-none"
+                        className="w-full rounded-xl border border-line px-4 py-3 text-ink placeholder:text-ink-faint focus:border-violet focus:outline-none resize-none bg-white/[0.03]"
                       />
                     </div>
 

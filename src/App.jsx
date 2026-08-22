@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
+import ErrorBoundary from './components/ErrorBoundary'
 import { AuthProvider } from './context/AuthContext'
 import { PublicAuthProvider } from './context/PublicAuthContext'
 
@@ -54,33 +55,35 @@ export default function App() {
         <div className="flex min-h-screen flex-col bg-base">
           {!isAdminRoute && <Navbar />}
           <main className="flex-1">
-            <Suspense fallback={<RouteFallback />}>
-              <AnimatePresence mode="wait">
-                <Routes location={location} key={location.pathname}>
-                  <Route path="/" element={<PageTransition><Home /></PageTransition>} />
-                  <Route path="/categories" element={<PageTransition><Categories /></PageTransition>} />
-                  <Route path="/category/:slug" element={<PageTransition><CategoryDetail /></PageTransition>} />
-                  <Route path="/prompt/:slug" element={<PageTransition><PromptDetails /></PageTransition>} />
-                  <Route path="/search" element={<PageTransition><SearchResults /></PageTransition>} />
-                  <Route path="/latest" element={<PageTransition><Latest /></PageTransition>} />
-                  <Route path="/popular" element={<PageTransition><Popular /></PageTransition>} />
-                  <Route path="/account" element={<PageTransition><UserAccount /></PageTransition>} />
-                  <Route path="/admin/login" element={<PageTransition><AdminLogin /></PageTransition>} />
-                  <Route
-                    path="/admin/dashboard"
-                    element={
-                      <ProtectedRoute>
-                        <PageTransition><AdminDashboard /></PageTransition>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
-                  <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
-                  <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
-                  <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
-                </Routes>
-              </AnimatePresence>
-            </Suspense>
+            <ErrorBoundary>
+              <Suspense fallback={<RouteFallback />}>
+                <AnimatePresence mode="wait">
+                  <Routes location={location} key={location.pathname}>
+                    <Route path="/" element={<PageTransition><Home /></PageTransition>} />
+                    <Route path="/categories" element={<PageTransition><Categories /></PageTransition>} />
+                    <Route path="/category/:slug" element={<PageTransition><CategoryDetail /></PageTransition>} />
+                    <Route path="/prompt/:slug" element={<PageTransition><PromptDetails /></PageTransition>} />
+                    <Route path="/search" element={<PageTransition><SearchResults /></PageTransition>} />
+                    <Route path="/latest" element={<PageTransition><Latest /></PageTransition>} />
+                    <Route path="/popular" element={<PageTransition><Popular /></PageTransition>} />
+                    <Route path="/account" element={<PageTransition><UserAccount /></PageTransition>} />
+                    <Route path="/admin/login" element={<PageTransition><AdminLogin /></PageTransition>} />
+                    <Route
+                      path="/admin/dashboard"
+                      element={
+                        <ProtectedRoute>
+                          <PageTransition><AdminDashboard /></PageTransition>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
+                    <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
+                    <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
+                    <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
+                  </Routes>
+                </AnimatePresence>
+              </Suspense>
+            </ErrorBoundary>
           </main>
           {!isAdminRoute && <Footer />}
         </div>
