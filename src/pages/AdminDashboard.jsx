@@ -61,7 +61,7 @@ import {
 } from 'lucide-react'
 import SEO from '../components/SEO'
 import { useAuth } from '../hooks/useAuth'
-import { supabase } from '../services/supabaseClient'
+import { supabaseSystem } from '../services/supabaseSystemClient'
 import {
   getAdminPrompts,
   getAdminStats,
@@ -796,7 +796,7 @@ export default function AdminDashboard() {
     }
     try {
       setPasswordUpdating(true)
-      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      const { error } = await supabaseSystem.auth.updateUser({ password: newPassword })
       if (error) throw error
       notify('success', 'Password updated successfully.')
       setNewPassword('')

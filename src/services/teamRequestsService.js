@@ -1,16 +1,25 @@
 import { supabase } from './supabaseClient'
+import { supabaseSystem } from './supabaseSystemClient'
+
+function getActiveClient() {
+  if (typeof window !== 'undefined' && window.sessionStorage.getItem('pv-system-auth')) {
+    return supabaseSystem
+  }
+  return supabase
+}
 
 /**
  * Submit a team member request
  */
 export async function submitTeamMemberRequest({ requestedCategoryId, message }) {
-  const { data: { user } } = await supabase.auth.getUser()
+  const activeClient = supabase // Always public client for submission
+  const { data: { user } } = await activeClient.auth.getUser()
   if (!user) {
     throw new Error('User must be authenticated to submit team member request')
   }
 
   // Check if user already has a pending request
-  const { data: existing, error: checkErr } = await supabase
+  const { data: existing, error: checkErr } = await activeClient
     .from('team_member_requests')
     .select('id, status')
     .eq('user_id', user.id)
@@ -69,7 +78,8 @@ export async function submitTeamMemberRequest({ requestedCategoryId, message }) 
  */
 export async function getTeamMemberRequests({ status = null } = {}) {
   try {
-    let query = supabase
+    const client = getActiveClient()
+    let query = client
       .from('team_member_requests')
       .select('*')
       .order('created_at', { ascending: false })
@@ -88,7 +98,7 @@ export async function getTeamMemberRequests({ status = null } = {}) {
     if (!data || data.length === 0) return []
 
     // Fetch category names safely
-    const { data: categories } = await supabase.from('categories').select('id, name')
+    const { data: categories } = await client.from('categories').select('id, name')
     const categoryMap = {}
     categories?.forEach(c => { categoryMap[c.id] = c.name })
 
@@ -111,13 +121,14 @@ export async function approveTeamMemberRequest(requestId, assignedCategoryId = n
     throw new Error('Request ID is required to approve team member.')
   }
 
+  const client = getActiveClient()
   const categoryId = typeof assignedCategoryId === 'string' 
     ? assignedCategoryId 
     : assignedCategoryId?.assignedCategoryId || null
 
   // 1. Try RPC call first if configured in Supabase
   try {
-    const { error: rpcError } = await supabase.rpc('approve_team_member_request', {
+    const { error: rpcError } = await client.rpc('approve_team_member_request', {
       request_id: requestId,
       assigned_category_id: categoryId
     })
@@ -128,7 +139,7 @@ export async function approveTeamMemberRequest(requestId, assignedCategoryId = n
 
   // 2. Direct fallback approval
   // Fetch request record
-  const { data: request, error: fetchErr } = await supabase
+  const { data: request, error: fetchErr } = await client
     .from('team_member_requests')
     .select('*')
     .eq('id', requestId)
@@ -142,7 +153,7 @@ export async function approveTeamMemberRequest(requestId, assignedCategoryId = n
   const targetUserId = request.user_id
 
   // a. Update request status to approved
-  const { error: updateErr } = await supabase
+  const { error: updateErr } = await client
     .from('team_member_requests')
     .update({ 
       status: 'approved',
@@ -156,7 +167,7 @@ export async function approveTeamMemberRequest(requestId, assignedCategoryId = n
 
   // b. Create category_admin profile in admin_profiles table
   const displayName = request.user_email ? request.user_email.split('@')[0] : 'Team Member'
-  const { error: profileErr } = await supabase
+  const { error: profileErr } = await client
     .from('admin_profiles')
     .upsert({
       id: targetUserId,
@@ -179,7 +190,8 @@ export async function rejectTeamMemberRequest(requestId, reason = '') {
     throw new Error('Request ID is required to reject team member.')
   }
 
-  const { error } = await supabase
+  const client = getActiveClient()
+  const { error } = await client
     .from('team_member_requests')
     .update({ 
       status: 'rejected',
@@ -198,7 +210,8 @@ export async function rejectTeamMemberRequest(requestId, reason = '') {
 export async function getUserRequestStatus(userId) {
   if (!userId) return null
   try {
-    const { data, error } = await supabase
+    const client = supabase // Always public client for public user account
+    const { data, error } = await client
       .from('team_member_requests')
       .select('*, categories(name)')
       .eq('user_id', userId)

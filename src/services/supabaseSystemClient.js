@@ -9,16 +9,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-// Public Supabase Client (for public users & team members)
-export const supabase = createClient(
+// System Supabase Client (ISOLATED for Super Admin System only)
+export const supabaseSystem = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder-key',
   {
     auth: {
-      storageKey: 'pv-public-auth',
+      storageKey: 'pv-system-auth',
+      storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,
+      detectSessionInUrl: false,
     },
   }
 )

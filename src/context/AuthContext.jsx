@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
-import { supabase } from '../services/supabaseClient'
+import { supabaseSystem } from '../services/supabaseSystemClient'
 
 const AuthContext = createContext({
   user: null,
@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const isFetchingRef = useRef(false)
 
-  // Fetch admin profile for the logged in user
+  // Fetch admin profile for the logged in user using system client
   const fetchProfile = useCallback(async (userId) => {
     if (!userId) {
       setProfile(null)
@@ -34,7 +34,7 @@ export function AuthProvider({ children }) {
     isFetchingRef.current = true
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseSystem
         .from('admin_profiles')
         .select('*')
         .eq('id', userId)
@@ -59,8 +59,8 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let isMounted = true
 
-    // 1. Initial session load
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // 1. Initial session load for system client
+    supabaseSystem.auth.getSession().then(async ({ data: { session } }) => {
       if (!isMounted) return
       setSession(session)
       const currentUser = session?.user ?? null
@@ -73,8 +73,8 @@ export function AuthProvider({ children }) {
       if (isMounted) setLoading(false)
     })
 
-    // 2. Auth state subscription
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    // 2. Auth state subscription for system client
+    const { data: { subscription } } = supabaseSystem.auth.onAuthStateChange(async (_event, newSession) => {
       if (!isMounted) return
       setSession(newSession)
       const currentUser = newSession?.user ?? null
@@ -94,7 +94,7 @@ export function AuthProvider({ children }) {
   }, [fetchProfile])
 
   const signIn = async ({ email, password }) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabaseSystem.auth.signInWithPassword({
       email,
       password,
     })
@@ -106,7 +106,7 @@ export function AuthProvider({ children }) {
   }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
+    const { error } = await supabaseSystem.auth.signOut()
     setProfile(null)
     setUser(null)
     setSession(null)

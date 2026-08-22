@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { Lock, Mail, Loader2, ShieldCheck, Zap } from 'lucide-react'
 import SEO from '../components/SEO'
-import { supabase } from '../services/supabaseClient'
+import { supabaseSystem } from '../services/supabaseSystemClient'
 import { useAuth } from '../hooks/useAuth'
 
 export default function SystemLogin() {
@@ -22,7 +22,7 @@ export default function SystemLogin() {
 
     try {
       setLoading(true)
-      const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: authErr } = await supabaseSystem.auth.signInWithPassword({
         email: data.email.trim(),
         password: data.password,
       })
@@ -34,8 +34,8 @@ export default function SystemLogin() {
         throw new Error('Authentication failed.')
       }
 
-      // Check admin_profiles table strictly for super_admin role
-      let { data: profileData } = await supabase
+      // Check admin_profiles table strictly for super_admin role using system client
+      let { data: profileData } = await supabaseSystem
         .from('admin_profiles')
         .select('*')
         .eq('id', userId)
@@ -43,7 +43,7 @@ export default function SystemLogin() {
 
       // If no admin profile exists yet for super admin email or system has no super_admins, bootstrap
       if (!profileData) {
-        const { count: superAdminCount } = await supabase
+        const { count: superAdminCount } = await supabaseSystem
           .from('admin_profiles')
           .select('id', { count: 'exact', head: true })
           .eq('role', 'super_admin')
@@ -56,7 +56,7 @@ export default function SystemLogin() {
             created_at: new Date().toISOString()
           }
 
-          const { data: inserted } = await supabase
+          const { data: inserted } = await supabaseSystem
             .from('admin_profiles')
             .upsert(bootstrapProfile)
             .select()
@@ -67,8 +67,8 @@ export default function SystemLogin() {
       }
 
       if (!profileData || profileData.role !== 'super_admin') {
-        // Sign out immediately and block access
-        await supabase.auth.signOut()
+        // Sign out immediately from system client and block access
+        await supabaseSystem.auth.signOut()
         throw new Error('Access denied: Super Admin credentials required.')
       }
 
