@@ -47,11 +47,21 @@ export default {
         blink: { '0%,100%': { opacity: 1 }, '50%': { opacity: 0 } },
         floatY: { '0%,100%': { transform: 'translateY(0px)' }, '50%': { transform: 'translateY(-8px)' } },
         shimmer: { '0%': { backgroundPosition: '-200% 0' }, '100%': { backgroundPosition: '200% 0' } },
+        'scan-line': {
+          '0%': { transform: 'translateY(-100vh)' },
+          '100%': { transform: 'translateY(100vh)' }
+        },
+        'draw-line': {
+          '0%': { 'stroke-dasharray': '0 100' },
+          '100%': { 'stroke-dasharray': '100 0' }
+        },
       },
       animation: {
         blink: 'blink 1s step-end infinite',
         floatY: 'floatY 5s ease-in-out infinite',
         shimmer: 'shimmer 2.2s linear infinite',
+        'scan-line': 'scan-line 8s linear infinite',
+        'draw-line': 'draw-line 2s ease-out forwards',
       },
       borderRadius: {
         xl2: '1.25rem',

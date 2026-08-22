@@ -87,10 +87,12 @@ import {
   updateAdminProfile,
   deleteAdminProfile,
   getPromptImages,
+} from '../services/promptService'
+import {
   getTeamMemberRequests,
   approveTeamMemberRequest,
   rejectTeamMemberRequest,
-} from '../services/promptService'
+} from '../services/teamRequestsService'
 import { uploadImageToGitHub } from '../services/githubUpload'
 import { formatGoogleDriveImageUrl, extractGoogleDriveId, detectImageSource } from '../utils/googleDrive'
 import { extractVariables } from '../utils/variableParser'
@@ -935,13 +937,13 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Create Button */}
+          {/* Create Button - New Gradient Style */}
           <button
             onClick={() => {
               openNewPromptModal()
               setSidebarOpen(false)
             }}
-            className="btn-primary w-full justify-center !py-2.5 text-xs shadow-glow"
+            className="w-full bg-gradient-to-r from-violet to-violet-soft text-white py-2.5 px-4 rounded-full font-medium shadow-glow hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 text-xs"
           >
             <Plus size={15} /> Create Prompt
           </button>
@@ -1131,6 +1133,17 @@ export default function AdminDashboard() {
         {/* TOP HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line/60 pb-6">
           <div>
+            {/* Breadcrumb */}
+            <p className="text-xs font-mono text-ink-muted mb-1">
+              Dashboard / {activeTab === 'prompts' && 'Prompts Library'}
+              {activeTab === 'pending' && 'Pending Review'}
+              {activeTab === 'categories' && 'Categories & Tags'}
+              {activeTab === 'admins' && 'Admin Team'}
+              {activeTab === 'teamRequests' && 'Team Requests'}
+              {activeTab === 'messages' && 'Contact Inbox'}
+              {activeTab === 'analytics' && 'Analytics'}
+              {activeTab === 'profile' && 'Account & Security'}
+            </p>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">
                 {activeTab === 'prompts' && 'Prompts Library'}
@@ -1156,18 +1169,20 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-2.5">
+            {/* Refresh Button - Ghost Style */}
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="btn-ghost !py-2 !px-3 text-xs"
+              className="px-4 py-2 rounded-full border border-line/60 bg-surface/30 text-ink-muted hover:text-ink hover:border-violet/50 transition-all text-xs"
               title="Refresh Data"
             >
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline">Refresh</span>
+              <span className="hidden sm:inline ml-2">Refresh</span>
             </button>
+            {/* New Prompt Button - Gradient Style */}
             <button
               onClick={openNewPromptModal}
-              className="btn-primary !py-2 !px-3 text-xs shadow-glow"
+              className="bg-gradient-to-r from-violet to-violet-soft text-white py-2 px-4 rounded-full font-medium shadow-glow hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-xs"
             >
               <Plus size={14} /> New Prompt
             </button>
@@ -1226,17 +1241,22 @@ export default function AdminDashboard() {
                   placeholder="Search prompts by title, description, or tags..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-line bg-surface/50 pl-9 pr-3 py-2 text-xs text-ink placeholder:text-ink-faint focus:border-violet focus:outline-none"
+                  className="w-full rounded-full border border-line bg-surface/50 pl-9 pr-3 py-2.5 text-xs text-ink placeholder:text-ink-faint focus:border-violet focus:outline-none"
                 />
               </div>
 
               <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-                {/* Status Filter */}
+                {/* Status Filter - Pill Style */}
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   aria-label="Filter by prompt status"
-                  className="rounded-xl border border-line bg-surface/60 px-3 py-2 text-xs text-ink focus:border-violet focus:outline-none"
+                  className="rounded-full border border-line bg-surface/60 px-4 py-2.5 text-xs text-ink focus:border-violet focus:outline-none appearance-none bg-no-repeat bg-right pr-8"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.5rem center',
+                    backgroundSize: '1rem 1rem'
+                  }}
                 >
                   <option value="all">All Statuses</option>
                   <option value="published">Published</option>
@@ -1245,13 +1265,18 @@ export default function AdminDashboard() {
                   <option value="draft">Drafts</option>
                 </select>
 
-                {/* Category Filter (Super Admin only, locked for Category Admin) */}
+                {/* Category Filter (Super Admin only, locked for Category Admin) - Pill Style */}
                 {isSuperAdmin && (
                   <select
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
                     aria-label="Filter by prompt category"
-                    className="rounded-xl border border-line bg-surface/60 px-3 py-2 text-xs text-ink focus:border-violet focus:outline-none"
+                    className="rounded-full border border-line bg-surface/60 px-4 py-2.5 text-xs text-ink focus:border-violet focus:outline-none appearance-none bg-no-repeat bg-right pr-8"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                      backgroundPosition: 'right 0.5rem center',
+                      backgroundSize: '1rem 1rem'
+                    }}
                   >
                     <option value="all">All Categories</option>
                     {categoriesList.map((c) => (
@@ -1301,16 +1326,23 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y divide-line/40">
                       {filteredPrompts.map((p) => (
-                        <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
+                        <tr key={p.id} className="hover:bg-violet/[0.02] transition-colors group">
                           <td className="px-4 py-3.5 max-w-xs sm:max-w-sm">
                             <div className="flex items-center gap-3">
-                              {p.featuredImage && (
-                                <img
-                                  src={p.featuredImage}
-                                  alt=""
-                                  className="h-10 w-14 rounded-lg object-cover border border-line shrink-0"
-                                />
-                              )}
+                              {/* Thumbnail Image */}
+                              <div className="w-10 h-10 rounded-lg border border-line overflow-hidden bg-surface/50 shrink-0">
+                                {p.featuredImage ? (
+                                  <img
+                                    src={p.featuredImage}
+                                    alt=""
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet/10 to-cyan/10">
+                                    <FileText size={14} className="text-ink-faint" />
+                                  </div>
+                                )}
+                              </div>
                               <div className="min-w-0">
                                 <Link
                                   to={`/prompt/${p.slug}`}
@@ -1334,19 +1366,29 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td className="px-4 py-3.5">
-                            <span
-                              className={`chip !py-0.5 !text-[10px] font-semibold uppercase ${
-                                p.status === 'published'
-                                  ? '!border-cyan/30 !bg-cyan/10 !text-cyan'
+                            <div className="flex items-center gap-1.5">
+                              {/* Status Dot */}
+                              <div className={`w-2 h-2 rounded-full ${
+                                p.status === 'published' ? 'bg-green-500' :
+                                p.status === 'pending' ? 'bg-amber-500' :
+                                p.status === 'rejected' ? 'bg-red-500' :
+                                'bg-gray-500'
+                              }`} />
+                              {/* Status Text */}
+                              <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
+                                p.status === 'published' 
+                                  ? 'bg-green-500/10 text-green-400 border border-green-500/20'
                                   : p.status === 'pending'
-                                  ? '!border-amber/40 !bg-amber/15 !text-amber animate-pulse'
+                                  ? 'bg-amber/10 text-amber border border-amber/30'
                                   : p.status === 'rejected'
-                                  ? '!border-red-500/40 !bg-red-500/15 !text-red-400'
-                                  : '!border-line !bg-white/[0.04] !text-ink-faint'
-                              }`}
-                            >
-                              {p.status === 'pending' ? 'Pending Review' : p.status}
-                            </span>
+                                  ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                  : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+                              }`}>
+                                {p.status === 'pending' ? 'Pending' : 
+                                 p.status === 'published' ? 'Published' : 
+                                 p.status === 'rejected' ? 'Rejected' : 'Draft'}
+                              </span>
+                            </div>
                           </td>
                           <td className="px-4 py-3.5 text-ink-faint font-mono text-[11px]">
                             {p.views.toLocaleString()} / {p.copies.toLocaleString()}
@@ -1389,6 +1431,27 @@ export default function AdminDashboard() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+                
+                {/* Pagination Controls */}
+                <div className="border-t border-line/40 px-4 py-3 flex items-center justify-between">
+                  <div className="text-xs text-ink-muted">
+                    Showing {filteredPrompts.length} of {promptsList.length} prompts
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button className="px-3 py-1 text-xs text-ink-muted hover:text-ink border border-line rounded-full hover:bg-white/[0.04] transition-colors">
+                      Prev
+                    </button>
+                    <button className="px-3 py-1 text-xs bg-violet/20 text-violet-soft border border-violet/30 rounded-full">
+                      1
+                    </button>
+                    <button className="px-3 py-1 text-xs text-ink-muted hover:text-ink border border-line rounded-full hover:bg-white/[0.04] transition-colors">
+                      2
+                    </button>
+                    <button className="px-3 py-1 text-xs text-ink-muted hover:text-ink border border-line rounded-full hover:bg-white/[0.04] transition-colors">
+                      Next
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -2523,13 +2586,13 @@ export default function AdminDashboard() {
   )
 }
 
-function SidebarLink({ active, onClick, icon: Icon, label, badge, badgeColor = 'cyan' }) {
+function SidebarLink({ active, onClick, icon: Icon, label, badge, badgeType = 'neutral' }) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center justify-between w-full rounded-xl px-3 py-2 text-xs font-medium transition-all ${
+      className={`flex items-center justify-between w-full rounded-xl px-3 py-2.5 text-xs font-medium transition-all relative ${
         active
-          ? 'bg-violet/15 text-violet-soft border border-violet/30 shadow-glow font-semibold'
+          ? 'bg-violet/10 text-violet-soft border-l-2 border-violet pl-2 font-semibold'
           : 'text-ink-muted hover:bg-white/[0.04] hover:text-ink'
       }`}
     >
@@ -2539,10 +2602,10 @@ function SidebarLink({ active, onClick, icon: Icon, label, badge, badgeColor = '
       </div>
       {badge !== undefined && badge !== 0 && (
         <span
-          className={`chip !py-0.5 !px-1.5 !text-[10px] font-mono ${
-            badgeColor === 'amber'
-              ? '!border-amber/40 !bg-amber/20 !text-amber font-semibold animate-pulse'
-              : '!border-line !bg-surface !text-cyan'
+          className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium ${
+            badgeType === 'urgent'
+              ? 'bg-amber/20 text-amber border border-amber/30'
+              : 'bg-surface/80 text-ink-faint border border-line/50'
           }`}
         >
           {badge}
@@ -2553,29 +2616,83 @@ function SidebarLink({ active, onClick, icon: Icon, label, badge, badgeColor = '
 }
 
 function StatCard({ title, value, icon: Icon, change, highlight = false }) {
+  const getCardTheme = () => {
+    if (title === 'Total Prompts') return { color: 'violet', blob: 'bg-violet/20' }
+    if (title === 'Pending Review') return { color: 'amber', blob: 'bg-amber/20' }
+    if (title === 'Total Views') return { color: 'cyan', blob: 'bg-cyan/20' }
+    if (title === 'Total Copies') return { color: 'green', blob: 'bg-green-500/20' }
+    return { color: 'violet', blob: 'bg-violet/20' }
+  }
+
+  const theme = getCardTheme()
+  const isAllCaughtUp = title === 'Pending Review' && value === 0
+
+  // Generate simple trend line points for sparkline
+  const generateSparklinePoints = () => {
+    const points = []
+    const width = 60
+    const height = 20
+    for (let i = 0; i <= 6; i++) {
+      const x = (i / 6) * width
+      const y = height - (Math.random() * 0.5 + 0.3) * height
+      points.push(`${x},${y}`)
+    }
+    return points.join(' ')
+  }
+
   return (
-    <div
-      className={`glass-card p-4 sm:p-5 flex flex-col justify-between transition-all ${
-        highlight ? 'border-amber/40 bg-amber/[0.04]' : ''
-      }`}
-    >
-      <div className="flex items-center justify-between mb-2">
+    <div className="relative glass-card p-4 sm:p-5 flex flex-col justify-between transition-all overflow-hidden">
+      {/* Background Glow Blob */}
+      <div className={`absolute top-0 right-0 w-16 h-16 ${theme.blob} rounded-full blur-xl opacity-30`} />
+      
+      <div className="flex items-center justify-between mb-3 relative z-10">
         <span className="text-[11px] sm:text-xs font-medium text-ink-muted">{title}</span>
-        <span
-          className={`grid h-8 w-8 place-items-center rounded-xl border ${
-            highlight
-              ? 'bg-amber/15 border-amber/30 text-amber'
-              : 'bg-white/[0.02] border-line text-violet-soft'
+        <div
+          className={`w-6 h-6 rounded-lg flex items-center justify-center ${
+            theme.color === 'violet' ? 'bg-violet/20 text-violet-soft' :
+            theme.color === 'amber' ? 'bg-amber/20 text-amber' :
+            theme.color === 'cyan' ? 'bg-cyan/20 text-cyan' :
+            'bg-green-500/20 text-green-400'
           }`}
         >
-          <Icon size={15} />
-        </span>
+          <Icon size={12} />
+        </div>
       </div>
-      <div>
-        <p className={`font-display text-xl sm:text-2xl font-bold ${highlight ? 'text-amber' : 'text-ink'}`}>
-          {value}
-        </p>
-        {change && <p className="text-[10px] sm:text-[11px] text-ink-faint mt-0.5">{change}</p>}
+      
+      <div className="relative z-10">
+        {isAllCaughtUp ? (
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="text-sm text-green-400 font-medium">All caught up</span>
+          </div>
+        ) : (
+          <p className="font-display text-xl sm:text-2xl font-bold text-ink mb-2">
+            {typeof value === 'string' ? value : value?.toLocaleString()}
+          </p>
+        )}
+        
+        {/* Animated Sparkline */}
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-ink-faint">{change}</span>
+          <svg width="60" height="20" className="opacity-60">
+            <polyline
+              fill="none"
+              stroke={
+                theme.color === 'violet' ? '#7C5CFF' :
+                theme.color === 'amber' ? '#F59E0B' :
+                theme.color === 'cyan' ? '#3DD6F5' :
+                '#10B981'
+              }
+              strokeWidth="1.5"
+              points={generateSparklinePoints()}
+              className="animate-draw-line"
+              style={{
+                strokeDasharray: '100',
+                strokeDashoffset: '100'
+              }}
+            />
+          </svg>
+        </div>
       </div>
     </div>
   )

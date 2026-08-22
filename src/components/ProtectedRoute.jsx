@@ -17,7 +17,8 @@ export default function ProtectedRoute({ children, requireSuperAdmin = false }) 
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/admin/login" state={{ from: location }} replace />
+    // Redirect to system login for admin dashboard access
+    return <Navigate to="/system-access/login" state={{ from: location }} replace />
   }
 
   if (requireSuperAdmin && !isSuperAdmin) {
