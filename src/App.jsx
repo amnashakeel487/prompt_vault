@@ -19,6 +19,7 @@ const Popular = lazy(() => import('./pages/Popular'))
 const AdminLogin = lazy(() => import('./pages/AdminLogin'))
 const SystemLogin = lazy(() => import('./pages/SystemLogin'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const TeamDashboard = lazy(() => import('./pages/TeamDashboard'))
 const UserAccount = lazy(() => import('./pages/UserAccount'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 const Privacy = lazy(() => import('./pages/Privacy'))
@@ -48,7 +49,9 @@ function PageTransition({ children }) {
 
 export default function App() {
   const location = useLocation()
-  const isAdminRoute = location.pathname.startsWith('/admin') || location.pathname.startsWith('/system-access')
+  const isAdminRoute = location.pathname.startsWith('/admin') || 
+                      location.pathname.startsWith('/system-access') || 
+                      location.pathname.startsWith('/team')
 
   return (
     <AuthProvider>
@@ -78,6 +81,7 @@ export default function App() {
                         </ProtectedRoute>
                       }
                     />
+                    <Route path="/team/dashboard" element={<PageTransition><TeamDashboard /></PageTransition>} />
                     <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
                     <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
                     <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />

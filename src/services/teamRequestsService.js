@@ -45,7 +45,7 @@ export async function submitTeamMemberRequest({ requestedCategoryId, message }) 
     status: 'pending'
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await activeClient
     .from('team_member_requests')
     .insert([payload])
     .select()
@@ -55,7 +55,7 @@ export async function submitTeamMemberRequest({ requestedCategoryId, message }) 
     // Retry without user_email column in case schema hasn't added user_email column yet
     if (error.message?.includes('user_email')) {
       delete payload.user_email
-      const { data: retryData, error: retryErr } = await supabase
+      const { data: retryData, error: retryErr } = await activeClient
         .from('team_member_requests')
         .insert([payload])
         .select()
@@ -78,7 +78,7 @@ export async function submitTeamMemberRequest({ requestedCategoryId, message }) 
  */
 export async function getTeamMemberRequests({ status = null } = {}) {
   try {
-    const client = getActiveClient()
+    const client = supabaseSystem // Always use system client for admin access
     let query = client
       .from('team_member_requests')
       .select('*')
@@ -97,7 +97,7 @@ export async function getTeamMemberRequests({ status = null } = {}) {
 
     if (!data || data.length === 0) return []
 
-    // Fetch category names safely
+    // Fetch category names safely using system client
     const { data: categories } = await client.from('categories').select('id, name')
     const categoryMap = {}
     categories?.forEach(c => { categoryMap[c.id] = c.name })
@@ -121,7 +121,7 @@ export async function approveTeamMemberRequest(requestId, assignedCategoryId = n
     throw new Error('Request ID is required to approve team member.')
   }
 
-  const client = getActiveClient()
+  const client = supabaseSystem // Always use system client for admin operations
   const categoryId = typeof assignedCategoryId === 'string' 
     ? assignedCategoryId 
     : assignedCategoryId?.assignedCategoryId || null
@@ -190,11 +190,12 @@ export async function rejectTeamMemberRequest(requestId, reason = '') {
     throw new Error('Request ID is required to reject team member.')
   }
 
-  const client = getActiveClient()
+  const client = supabaseSystem // Always use system client for admin operations
   const { error } = await client
     .from('team_member_requests')
     .update({ 
       status: 'rejected',
+      rejection_reason: reason,
       updated_at: new Date().toISOString()
     })
     .eq('id', requestId)

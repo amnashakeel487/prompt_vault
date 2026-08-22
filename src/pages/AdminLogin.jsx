@@ -47,10 +47,10 @@ export default function AdminLogin() {
         throw new Error('Super Admin accounts must log in via the dedicated portal.')
       }
 
-      // Route category admin to dashboard, public user to account
+      // Route category admin to team dashboard, public user to account
       if (profileData?.role === 'category_admin') {
         await refreshProfile()
-        navigate('/admin/dashboard', { replace: true })
+        navigate('/team/dashboard', { replace: true })
       } else {
         navigate('/account', { replace: true })
       }

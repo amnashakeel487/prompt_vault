@@ -110,9 +110,31 @@ CREATE TABLE IF NOT EXISTS public.team_member_requests (
     requested_category_id TEXT REFERENCES public.categories(id) ON DELETE SET NULL,
     status TEXT DEFAULT 'pending' NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
     message TEXT,
+    user_email TEXT,
+    rejection_reason TEXT,
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+
+-- Add columns to team_member_requests if they don't exist
+DO $$
+BEGIN
+    -- Add user_email field for easier admin identification
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'team_member_requests' AND column_name = 'user_email'
+    ) THEN
+        ALTER TABLE public.team_member_requests ADD COLUMN user_email TEXT;
+    END IF;
+    
+    -- Add rejection_reason field for admin feedback
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'team_member_requests' AND column_name = 'rejection_reason'
+    ) THEN
+        ALTER TABLE public.team_member_requests ADD COLUMN rejection_reason TEXT;
+    END IF;
+END $$;
 
 -- Add content_type field to prompts for videos support
 DO $$

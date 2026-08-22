@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { User, Mail, LogOut, Heart, Send, AlertCircle, CheckCircle2, Users, ShieldCheck } from 'lucide-react'
 import SEO from '../components/SEO'
 import PromptCard from '../components/PromptCard'
@@ -11,8 +11,9 @@ import { getCategories } from '../services/promptService'
 import { formatPrompt } from '../services/promptService'
 
 export default function UserAccount() {
-  const { user, signOut } = usePublicAuth()
-  const { isSuperAdmin, isCategoryAdmin } = useAuth()
+  const { user, signOut, isCategoryAdmin } = usePublicAuth()
+  const { isSuperAdmin } = useAuth()
+  const navigate = useNavigate()
   const [favorites, setFavorites] = useState([])
   const [categories, setCategories] = useState([])
   const [teamRequest, setTeamRequest] = useState(null)
@@ -28,6 +29,13 @@ export default function UserAccount() {
   })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  // Redirect approved team members to their dashboard
+  useEffect(() => {
+    if (isCategoryAdmin && user) {
+      navigate('/team/dashboard', { replace: true })
+    }
+  }, [isCategoryAdmin, user, navigate])
 
   useEffect(() => {
     loadData()
@@ -141,22 +149,18 @@ export default function UserAccount() {
             
             {loading.teamRequest ? (
               <div className="text-ink-muted text-sm">Loading...</div>
-            ) : isSuperAdmin || isCategoryAdmin ? (
+            ) : isSuperAdmin ? (
               <div className="p-4 rounded-xl border border-violet/30 bg-violet/10">
                 <div className="flex items-center gap-2 mb-2">
                   <ShieldCheck size={18} className="text-violet-soft" />
-                  <span className="font-medium text-violet-soft">
-                    {isSuperAdmin ? 'Super Admin Account' : 'Team Member (Category Admin)'}
-                  </span>
+                  <span className="font-medium text-violet-soft">Super Admin Account</span>
                 </div>
-                <p className="text-sm text-ink-muted">
-                  {isSuperAdmin
-                    ? 'You have full system oversight and administrative permissions.'
-                    : 'You are an approved Team Member with category management access.'}
+                <p className="text-sm text-ink-muted mb-3">
+                  You have full system oversight and administrative permissions.
                 </p>
                 <Link 
                   to="/admin/dashboard" 
-                  className="inline-flex items-center gap-1.5 mt-3 btn-primary !py-2 !px-4 text-xs"
+                  className="inline-flex items-center gap-1.5 btn-primary !py-2 !px-4 text-xs"
                 >
                   Go to Admin Dashboard →
                 </Link>
@@ -180,18 +184,18 @@ export default function UserAccount() {
                     {teamRequest.status}
                   </span>
                 </div>
-                <p className="text-sm text-ink-muted">
-                  {teamRequest.status === 'approved' && 'You are a team member! '}
+                <p className="text-sm text-ink-muted mb-3">
+                  {teamRequest.status === 'approved' && 'You are an approved team member! '}
                   {teamRequest.status === 'pending' && 'Your request is being reviewed. '}
                   {teamRequest.status === 'rejected' && 'Your previous request was not approved. '}
                   Category: {teamRequest.categories?.name || 'Any'}
                 </p>
                 {teamRequest.status === 'approved' && (
                   <Link 
-                    to="/admin/dashboard" 
-                    className="inline-block mt-2 text-cyan hover:text-ink transition-colors text-sm"
+                    to="/team/dashboard" 
+                    className="inline-flex items-center gap-1.5 btn-primary !py-2 !px-4 text-xs"
                   >
-                    Go to Admin Dashboard →
+                    Go to Team Dashboard →
                   </Link>
                 )}
               </div>
