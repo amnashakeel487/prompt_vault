@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient'
 import { supabaseSystem } from './supabaseSystemClient'
 
 function getActiveClient() {
-  if (typeof window !== 'undefined' && window.sessionStorage.getItem('pv-system-auth')) {
+  if (typeof window !== 'undefined' && (window.localStorage.getItem('pv-system-auth') || window.localStorage.getItem('pv-system-auth-flag') || window.sessionStorage.getItem('pv-system-auth'))) {
     return supabaseSystem
   }
   return supabase

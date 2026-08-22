@@ -99,7 +99,7 @@ export function AuthProvider({ children }) {
       if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
         // Clear session storage on explicit logout or token refresh failure
         if (event === 'SIGNED_OUT' && typeof window !== 'undefined') {
-          window.sessionStorage.removeItem('pv-system-auth')
+          window.localStorage.removeItem('pv-system-auth-flag')
         }
       }
       
@@ -141,8 +141,8 @@ export function AuthProvider({ children }) {
     try {
       // Clear local storage session identifier
       if (typeof window !== 'undefined') {
-        window.sessionStorage.removeItem('pv-system-auth')
-        window.localStorage.removeItem('sb-' + supabaseSystem.supabaseKey + '-auth-token')
+        window.localStorage.removeItem('pv-system-auth-flag')
+        window.localStorage.removeItem('pv-system-auth')
       }
       
       const { error } = await supabaseSystem.auth.signOut()

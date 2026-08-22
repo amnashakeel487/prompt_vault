@@ -82,7 +82,7 @@ export default function SystemLogin() {
 
       // Mark session as system admin for session isolation
       if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem('pv-system-auth', 'true')
+        window.localStorage.setItem('pv-system-auth-flag', 'true')
       }
 
       await refreshProfile()
