@@ -779,17 +779,60 @@ export async function savePromptImages(promptId, images = []) {
  */
 export async function getAdminProfiles() {
   try {
-    const { data, error } = await supabase
+    // Import system client dynamically to avoid circular dependency
+    const { supabaseSystem } = await import('./supabaseSystemClient')
+    
+    // Query admin profiles with category information and join auth.users for email
+    const { data, error } = await supabaseSystem
       .from('admin_profiles')
-      .select('*')
+      .select(`
+        *,
+        categories(id, name, slug),
+        auth.users!inner(email)
+      `)
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.warn('Could not fetch admin profiles (table might be empty or migrating):', error.message)
-      return []
+      console.warn('Could not fetch admin profiles with auth data, trying simple query:', error.message)
+      
+      // Fallback: try simple query without auth.users join
+      const { data: simpleData, error: simpleError } = await supabaseSystem
+        .from('admin_profiles')
+        .select('*, categories(id, name, slug)')
+        .order('created_at', { ascending: false })
+      
+      if (simpleError) {
+        console.warn('Could not fetch admin profiles:', simpleError.message)
+        return []
+      }
+
+      // For simple query, we'll need to fetch emails separately
+      const profilesWithEmails = await Promise.all(
+        (simpleData || []).map(async (profile) => {
+          try {
+            const { data: userData } = await supabaseSystem.auth.admin.getUserById(profile.id)
+            return {
+              ...profile,
+              email: userData.user?.email || ''
+            }
+          } catch (e) {
+            console.warn('Could not fetch email for profile:', profile.id)
+            return {
+              ...profile,
+              email: profile.display_name || 'Unknown'
+            }
+          }
+        })
+      )
+
+      return profilesWithEmails.map(formatAdminProfile)
     }
 
-    return (data || []).map(formatAdminProfile)
+    // Format profiles with joined auth data
+    return (data || []).map(profile => formatAdminProfile({
+      ...profile,
+      email: profile.users?.email || profile.email || ''
+    }))
   } catch (err) {
     console.warn('Error fetching admin profiles:', err)
     return []
