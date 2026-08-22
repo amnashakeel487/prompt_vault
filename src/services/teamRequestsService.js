@@ -51,9 +51,9 @@ export async function submitTeamMemberRequest({ requestedCategoryId, message }) 
 /**
  * Get team member requests (super admin only)
  */
-export async function getTeamMemberRequests() {
+export async function getTeamMemberRequests({ status = null } = {}) {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('team_member_requests')
       .select(`
         *,
@@ -61,9 +61,19 @@ export async function getTeamMemberRequests() {
       `)
       .order('created_at', { ascending: false })
 
-    if (error) return []
+    if (status) {
+      query = query.eq('status', status)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.warn('Error loading team member requests:', error)
+      return []
+    }
     return data || []
-  } catch {
+  } catch (err) {
+    console.warn('Failed to load team member requests:', err)
     return []
   }
 }
