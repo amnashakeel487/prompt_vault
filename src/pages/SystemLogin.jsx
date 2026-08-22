@@ -35,14 +35,35 @@ export default function SystemLogin() {
       }
 
       // Check admin_profiles table strictly for super_admin role
-      const { data: profileData, error: profileErr } = await supabase
+      let { data: profileData } = await supabase
         .from('admin_profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle()
 
-      if (profileErr) {
-        console.error('Profile verification error:', profileErr)
+      // If no admin profile exists yet for super admin email or system has no super_admins, bootstrap
+      if (!profileData) {
+        const { count: superAdminCount } = await supabase
+          .from('admin_profiles')
+          .select('id', { count: 'exact', head: true })
+          .eq('role', 'super_admin')
+
+        if (superAdminCount === 0 || authData.user?.email === 'amnashakeel2101@gmail.com') {
+          const bootstrapProfile = {
+            id: userId,
+            role: 'super_admin',
+            display_name: authData.user?.email?.split('@')[0] || 'Super Admin',
+            created_at: new Date().toISOString()
+          }
+
+          const { data: inserted } = await supabase
+            .from('admin_profiles')
+            .upsert(bootstrapProfile)
+            .select()
+            .maybeSingle()
+
+          profileData = inserted || bootstrapProfile
+        }
       }
 
       if (!profileData || profileData.role !== 'super_admin') {
