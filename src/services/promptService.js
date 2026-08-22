@@ -305,79 +305,74 @@ export async function getPrompts({
   page = 1,
   limit = 12,
 } = {}) {
-  let query = supabase.from('prompts').select(`
-    *, 
-    prompt_images(*),
-    favorites_count:favorites(count)
-  `, { count: 'exact' })
+  try {
+    let query = supabase
+      .from('prompts')
+      .select('*, categories(*), subcategories(*), prompt_images(*)', { count: 'exact' })
 
-  // Public site only shows published
-  if (status) {
-    query = query.eq('status', status)
-  }
-  if (categoryId) {
-    query = query.eq('category_id', categoryId)
-  }
-  if (subcategoryId && subcategoryId !== 'all') {
-    query = query.eq('subcategory_id', subcategoryId)
-  }
-  if (featured !== undefined) {
-    query = query.eq('featured', featured)
-  }
-  if (popular !== undefined) {
-    query = query.eq('popular', popular)
-  }
-  if (trending !== undefined) {
-    query = query.eq('trending', trending)
-  }
-  if (search && search.trim()) {
-    const s = search.trim()
-    query = query.or(`title.ilike.%${s}%,description.ilike.%${s}%,prompt.ilike.%${s}%`)
-  }
+    // Public site only shows published
+    if (status) {
+      query = query.eq('status', status)
+    }
+    if (categoryId) {
+      query = query.eq('category_id', categoryId)
+    }
+    if (subcategoryId && subcategoryId !== 'all') {
+      query = query.eq('subcategory_id', subcategoryId)
+    }
+    if (featured !== undefined) {
+      query = query.eq('featured', featured)
+    }
+    if (popular !== undefined) {
+      query = query.eq('popular', popular)
+    }
+    if (trending !== undefined) {
+      query = query.eq('trending', trending)
+    }
+    if (search && search.trim()) {
+      const s = search.trim()
+      query = query.or(`title.ilike.%${s}%,description.ilike.%${s}%,prompt.ilike.%${s}%`)
+    }
 
-  // Sorting
-  let sortCol = sort === 'createdAt' ? 'created_at' : sort
-  if (sort === 'favorites') {
-    // For favorites sorting, we'll sort by a computed field
-    query = query.order('created_at', { ascending: false }) // fallback ordering
-  } else {
+    // Sorting
+    let sortCol = sort === 'createdAt' ? 'created_at' : sort
+    if (sortCol === 'favorites') {
+      sortCol = 'favorites_count'
+    }
     query = query.order(sortCol, { ascending: order === 'asc' })
-  }
 
-  // Range pagination
-  if (limit) {
-    const from = (page - 1) * limit
-    const to = from + limit - 1
-    query = query.range(from, to)
-  }
+    // Range pagination
+    if (limit) {
+      const from = (page - 1) * limit
+      const to = from + limit - 1
+      query = query.range(from, to)
+    }
 
-  const { data, count, error } = await query
-  if (error) {
-    console.error('Error fetching prompts:', error)
-    throw error
-  }
+    const { data, count, error } = await query
+    if (error) {
+      console.error('Error fetching prompts from Supabase:', error)
+      throw error
+    }
 
-  // Format prompts and add favorites count
-  let prompts = (data || []).map(formatPrompt).map(prompt => ({
-    ...prompt,
-    favoritesCount: prompt.favorites_count?.[0]?.count || 0
-  }))
+    const prompts = (data || []).map(formatPrompt)
 
-  // Handle favorites sorting in JavaScript since Supabase can't sort by aggregated field easily
-  if (sort === 'favorites') {
-    prompts = prompts.sort((a, b) => {
-      const aFav = a.favoritesCount || 0
-      const bFav = b.favoritesCount || 0
-      return order === 'asc' ? aFav - bFav : bFav - aFav
-    })
-  }
-
-  return {
-    prompts,
-    total: count || 0,
-    page,
-    limit,
-    totalPages: limit ? Math.ceil((count || 0) / limit) : 1,
+    return {
+      prompts,
+      total: count !== null && count !== undefined ? count : prompts.length,
+      page,
+      limit,
+      totalPages: limit ? Math.ceil((count || prompts.length || 0) / limit) : 1,
+    }
+  } catch (err) {
+    console.error('getPrompts execution error:', err)
+    return {
+      prompts: [],
+      total: 0,
+      page,
+      limit,
+      totalPages: 1,
+      error: err,
+    }
   }
 }
 

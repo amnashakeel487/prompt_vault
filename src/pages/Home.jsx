@@ -32,7 +32,10 @@ export default function Home() {
     status: 'published',
   })
 
-  const totalPromptCount = total > 0 ? `${total}+` : '120+'
+  const featuredList = featured.length > 0 ? featured : latest.slice(0, 6)
+  const mostFavoritedList = mostFavorited.length > 0 ? mostFavorited : latest.slice(0, 6)
+
+  const totalPromptCount = total > 0 ? `${total}+` : (latest.length > 0 ? `${latest.length}+` : '120+')
   const totalCategoriesCount = categories.length > 0 ? categories.length : 6
 
   return (
@@ -126,7 +129,7 @@ export default function Home() {
           <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">Featured prompts</h2>
           <p className="mt-1 text-xs sm:text-sm text-ink-muted">Hand-picked for consistently strong output.</p>
         </div>
-        {loadingFeatured ? (
+        {loadingFeatured && loadingLatest ? (
           <div className="flex gap-4 sm:gap-5 overflow-x-auto pb-4">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="min-w-[260px] sm:min-w-[300px] max-w-[280px] sm:max-w-[300px] glass-card h-72 animate-pulse" />
@@ -134,7 +137,7 @@ export default function Home() {
           </div>
         ) : (
           <div className="flex gap-4 sm:gap-5 overflow-x-auto pb-4 -mx-2 px-2 snap-x snap-mandatory">
-            {featured.map((p, i) => (
+            {featuredList.map((p, i) => (
               <div key={p.id} className="min-w-[260px] sm:min-w-[300px] max-w-[280px] sm:max-w-[300px] snap-start shrink-0">
                 <PromptCard prompt={p} index={i} />
               </div>
@@ -157,11 +160,11 @@ export default function Home() {
             View all <ArrowRight size={14} />
           </Link>
         </div>
-        {loadingFavorited ? (
+        {loadingFavorited && loadingLatest ? (
           <GridSkeleton count={6} />
         ) : (
           <div className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {mostFavorited.map((p, i) => (
+            {mostFavoritedList.map((p, i) => (
               <PromptCard key={p.id} prompt={p} index={i} />
             ))}
           </div>
