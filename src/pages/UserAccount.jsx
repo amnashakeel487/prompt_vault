@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { User, Mail, LogOut, Heart, Send, AlertCircle, CheckCircle2, Users } from 'lucide-react'
+import { User, Mail, LogOut, Heart, Send, AlertCircle, CheckCircle2, Users, ShieldCheck } from 'lucide-react'
 import SEO from '../components/SEO'
 import PromptCard from '../components/PromptCard'
 import { usePublicAuth } from '../context/PublicAuthContext'
+import { useAuth } from '../hooks/useAuth'
 import { getUserFavorites } from '../services/favoritesService'
 import { getUserRequestStatus, submitTeamMemberRequest } from '../services/teamRequestsService'
 import { getCategories } from '../services/promptService'
@@ -11,6 +12,7 @@ import { formatPrompt } from '../services/promptService'
 
 export default function UserAccount() {
   const { user, signOut } = usePublicAuth()
+  const { isSuperAdmin, isCategoryAdmin } = useAuth()
   const [favorites, setFavorites] = useState([])
   const [categories, setCategories] = useState([])
   const [teamRequest, setTeamRequest] = useState(null)
@@ -138,7 +140,27 @@ export default function UserAccount() {
             </h3>
             
             {loading.teamRequest ? (
-              <div className="text-ink-muted">Loading...</div>
+              <div className="text-ink-muted text-sm">Loading...</div>
+            ) : isSuperAdmin || isCategoryAdmin ? (
+              <div className="p-4 rounded-xl border border-violet/30 bg-violet/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <ShieldCheck size={18} className="text-violet-soft" />
+                  <span className="font-medium text-violet-soft">
+                    {isSuperAdmin ? 'Super Admin Account' : 'Team Member (Category Admin)'}
+                  </span>
+                </div>
+                <p className="text-sm text-ink-muted">
+                  {isSuperAdmin
+                    ? 'You have full system oversight and administrative permissions.'
+                    : 'You are an approved Team Member with category management access.'}
+                </p>
+                <Link 
+                  to="/admin/dashboard" 
+                  className="inline-flex items-center gap-1.5 mt-3 btn-primary !py-2 !px-4 text-xs"
+                >
+                  Go to Admin Dashboard →
+                </Link>
+              </div>
             ) : teamRequest ? (
               <div className={`p-4 rounded-xl border ${
                 teamRequest.status === 'approved' 
