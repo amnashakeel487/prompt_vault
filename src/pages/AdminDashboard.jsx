@@ -55,8 +55,9 @@ import {
   Link2,
   Image as ImageIcon,
   Star,
-  Upload,
   CheckSquare,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import SEO from '../components/SEO'
 import { useAuth } from '../hooks/useAuth'
@@ -125,6 +126,23 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('prompts') // 'prompts' | 'pending' | 'categories' | 'admins' | 'teamRequests' | 'messages' | 'analytics' | 'profile'
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isFetchingRef = useRef(false)
+
+  // Theme Management
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') || 'dark'
+    }
+    return 'dark'
+  })
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  function toggleTheme() {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  }
 
   // Redirect category admins away from super admin only tabs
   useEffect(() => {
@@ -856,22 +874,29 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-base text-ink flex flex-col md:flex-row">
-      <SEO title="Admin Dashboard | PromptVault" description="Manage prompts, reviews, and team." />
-
-      {/* MOBILE TOP BAR */}
+      <SEO title="Admin Dashboard | PromptVault" description="Manage prompts, reviews, and team." />      {/* MOBILE TOP BAR */}
       <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-line bg-surface/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="flex items-center gap-2">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-violet to-cyan text-white">
             <Zap size={14} />
           </span>
-          <span className="font-display font-semibold text-sm text-white">PromptVault</span>
+          <span className="font-display font-semibold text-sm text-ink">PromptVault</span>
         </div>
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 rounded-xl border border-line text-ink-muted hover:text-white"
-        >
-          <Menu size={18} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+            className="p-2 rounded-xl border border-line text-ink-muted hover:text-ink hover:bg-white/[0.04] transition-colors"
+          >
+            {theme === 'dark' ? <Sun size={16} className="text-amber" /> : <Moon size={16} className="text-violet" />}
+          </button>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 rounded-xl border border-line text-ink-muted hover:text-ink"
+          >
+            <Menu size={18} />
+          </button>
+        </div>
       </div>
 
       {/* SIDEBAR NAVIGATION */}
@@ -888,7 +913,7 @@ export default function AdminDashboard() {
                 <Zap size={16} />
               </span>
               <div>
-                <span className="font-display font-bold text-sm tracking-tight text-white">PromptVault</span>
+                <span className="font-display font-bold text-sm tracking-tight text-ink">PromptVault</span>
                 <span className="block text-[10px] text-cyan font-mono uppercase tracking-wider">
                   {isSuperAdmin ? 'Super Admin' : 'Category Admin'}
                 </span>
@@ -896,7 +921,7 @@ export default function AdminDashboard() {
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="md:hidden p-1.5 text-ink-faint hover:text-white"
+              className="md:hidden p-1.5 text-ink-faint hover:text-ink"
             >
               <X size={16} />
             </button>
@@ -906,7 +931,7 @@ export default function AdminDashboard() {
           {isCategoryAdmin && assignedCategory && (
             <div className="rounded-xl border border-amber/30 bg-amber/10 p-2.5">
               <p className="text-[10px] uppercase font-mono tracking-wider text-amber font-semibold">Assigned Category</p>
-              <p className="text-xs font-semibold text-white mt-0.5 truncate">{assignedCategory.name}</p>
+              <p className="text-xs font-semibold text-ink mt-0.5 truncate">{assignedCategory.name}</p>
             </div>
           )}
 
@@ -1034,10 +1059,23 @@ export default function AdminDashboard() {
               label="Account & Security"
             />
 
+            <button
+              onClick={toggleTheme}
+              className="w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs text-ink-muted transition-colors hover:bg-white/[0.04] hover:text-ink"
+            >
+              <div className="flex items-center gap-2.5">
+                {theme === 'dark' ? <Sun size={15} className="text-amber" /> : <Moon size={15} className="text-violet" />}
+                <span>{theme === 'dark' ? 'Light Theme' : 'Dark Theme'}</span>
+              </div>
+              <span className="text-[10px] font-mono uppercase text-ink-faint border border-line px-1.5 py-0.5 rounded">
+                {theme}
+              </span>
+            </button>
+
             <Link
               to="/"
               target="_blank"
-              className="flex items-center justify-between rounded-xl px-3 py-2 text-xs text-ink-muted transition-colors hover:bg-white/[0.04] hover:text-white"
+              className="flex items-center justify-between rounded-xl px-3 py-2 text-xs text-ink-muted transition-colors hover:bg-white/[0.04] hover:text-ink"
             >
               <div className="flex items-center gap-2.5">
                 <Globe size={15} className="text-cyan" />
@@ -1055,7 +1093,7 @@ export default function AdminDashboard() {
               {user?.email ? user.email.charAt(0).toUpperCase() : 'A'}
             </div>
             <div className="overflow-hidden">
-              <p className="truncate text-xs font-medium text-white">{profile?.displayName || user?.email || 'Admin'}</p>
+              <p className="truncate text-xs font-medium text-ink">{profile?.displayName || user?.email || 'Admin'}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className={`h-1.5 w-1.5 rounded-full ${isSuperAdmin ? 'bg-cyan' : 'bg-amber'} animate-pulse`} />
                 <span className="text-[10px] text-ink-muted capitalize">
@@ -1094,7 +1132,7 @@ export default function AdminDashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line/60 pb-6">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-display text-2xl sm:text-3xl font-semibold text-white">
+              <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">
                 {activeTab === 'prompts' && 'Prompts Library'}
                 {activeTab === 'pending' && 'Pending Review Queue'}
                 {activeTab === 'categories' && 'Categories & Tags'}
@@ -1188,7 +1226,7 @@ export default function AdminDashboard() {
                   placeholder="Search prompts by title, description, or tags..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-line bg-surface/50 pl-9 pr-3 py-2 text-xs text-white placeholder:text-ink-faint focus:border-violet focus:outline-none"
+                  className="w-full rounded-xl border border-line bg-surface/50 pl-9 pr-3 py-2 text-xs text-ink placeholder:text-ink-faint focus:border-violet focus:outline-none"
                 />
               </div>
 
@@ -1198,7 +1236,7 @@ export default function AdminDashboard() {
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   aria-label="Filter by prompt status"
-                  className="rounded-xl border border-line bg-surface/60 px-3 py-2 text-xs text-ink-muted focus:border-violet focus:outline-none"
+                  className="rounded-xl border border-line bg-surface/60 px-3 py-2 text-xs text-ink focus:border-violet focus:outline-none"
                 >
                   <option value="all">All Statuses</option>
                   <option value="published">Published</option>
@@ -1213,7 +1251,7 @@ export default function AdminDashboard() {
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
                     aria-label="Filter by prompt category"
-                    className="rounded-xl border border-line bg-surface/60 px-3 py-2 text-xs text-ink-muted focus:border-violet focus:outline-none"
+                    className="rounded-xl border border-line bg-surface/60 px-3 py-2 text-xs text-ink focus:border-violet focus:outline-none"
                   >
                     <option value="all">All Categories</option>
                     {categoriesList.map((c) => (
@@ -1235,7 +1273,7 @@ export default function AdminDashboard() {
             ) : filteredPrompts.length === 0 ? (
               <div className="glass-card p-12 text-center space-y-3">
                 <FileText size={32} className="text-ink-faint mx-auto" />
-                <p className="font-display text-sm font-semibold text-white">
+                <p className="font-display text-sm font-semibold text-ink">
                   No prompts found
                 </p>
                 <p className="text-xs text-ink-muted max-w-sm mx-auto">
@@ -1277,7 +1315,7 @@ export default function AdminDashboard() {
                                 <Link
                                   to={`/prompt/${p.slug}`}
                                   target="_blank"
-                                  className="font-medium text-white hover:text-violet-soft truncate block transition-colors"
+                                  className="font-medium text-ink hover:text-violet-soft truncate block transition-colors"
                                 >
                                   {p.title}
                                 </Link>
@@ -1325,7 +1363,7 @@ export default function AdminDashboard() {
                               {isSuperAdmin && (
                                 <button
                                   onClick={() => handleToggleStatus(p.id, p.status)}
-                                  className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-white transition-colors"
+                                  className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-ink transition-colors"
                                   title={p.status === 'published' ? 'Unpublish to Draft' : 'Direct Publish'}
                                 >
                                   {p.status === 'published' ? <Check size={13} className="text-cyan" /> : <Layers size={13} />}
@@ -1333,7 +1371,7 @@ export default function AdminDashboard() {
                               )}
                               <button
                                 onClick={() => openEditPromptModal(p)}
-                                className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-white transition-colors"
+                                className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-ink transition-colors"
                                 title="Edit Prompt"
                               >
                                 <Pencil size={13} />
@@ -1368,7 +1406,7 @@ export default function AdminDashboard() {
                   <CheckSquare size={20} />
                 </span>
                 <div>
-                  <h3 className="font-display font-semibold text-sm sm:text-base text-white">
+                  <h3 className="font-display font-semibold text-sm sm:text-base text-ink">
                     Approval Workflow Queue
                   </h3>
                   <p className="text-xs text-ink-muted">
@@ -1384,7 +1422,7 @@ export default function AdminDashboard() {
             {pendingList.length === 0 ? (
               <div className="glass-card p-12 text-center space-y-2">
                 <CheckCircle2 size={32} className="text-cyan mx-auto" />
-                <p className="font-display text-sm font-semibold text-white">
+                <p className="font-display text-sm font-semibold text-ink">
                   Inbox zero!
                 </p>
                 <p className="text-xs text-ink-muted">
@@ -1408,7 +1446,7 @@ export default function AdminDashboard() {
                             Submitted by {p.author || 'Admin'} · {p.createdAt || 'Recently'}
                           </span>
                         </div>
-                        <h3 className="font-display font-semibold text-base sm:text-lg text-white">
+                        <h3 className="font-display font-semibold text-base sm:text-lg text-ink">
                           {p.title}
                         </h3>
                         <p className="text-xs sm:text-sm text-ink-muted mt-1 leading-relaxed">
@@ -1462,7 +1500,7 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-display font-semibold text-lg text-white">
+                <h2 className="font-display font-semibold text-lg text-ink">
                   Categories ({categoriesList.length})
                 </h2>
                 <p className="text-xs text-ink-muted">
@@ -1482,7 +1520,7 @@ export default function AdminDashboard() {
                       <Sparkles size={18} />
                     </span>
                     <div>
-                      <h4 className="font-display font-semibold text-sm text-white">
+                      <h4 className="font-display font-semibold text-sm text-ink">
                         {cat.name}
                       </h4>
                       <p className="text-[11px] text-ink-faint">{cat.count || 0} published prompts</p>
@@ -1491,7 +1529,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => openEditCatModal(cat)}
-                      className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-white"
+                      className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-ink"
                     >
                       <Pencil size={13} />
                     </button>
@@ -1515,7 +1553,7 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-display font-semibold text-lg text-white">
+                <h2 className="font-display font-semibold text-lg text-ink">
                   Admin Team & Category Permissions ({adminsList.length})
                 </h2>
                 <p className="text-xs text-ink-muted">
@@ -1548,7 +1586,7 @@ export default function AdminDashboard() {
                               {adm.displayName?.charAt(0).toUpperCase() || 'A'}
                             </div>
                             <div>
-                              <p className="font-semibold text-white">{adm.displayName || 'Admin User'}</p>
+                              <p className="font-semibold text-ink">{adm.displayName || 'Admin User'}</p>
                               <p className="text-[11px] text-ink-faint font-mono">{adm.email || adm.id}</p>
                             </div>
                           </div>
@@ -1572,7 +1610,7 @@ export default function AdminDashboard() {
                               value={adm.assignedCategoryId || ''}
                               onChange={(e) => handleUpdateAdminCategory(adm.id, e.target.value)}
                               aria-label="Change admin assigned category"
-                              className="rounded-lg border border-line bg-surface/60 px-2.5 py-1 text-xs text-white focus:border-violet focus:outline-none"
+                              className="rounded-lg border border-line bg-surface/60 px-2.5 py-1 text-xs text-ink focus:border-violet focus:outline-none"
                             >
                               <option value="">Unassigned</option>
                               {categoriesList.map((c) => (
@@ -1611,7 +1649,7 @@ export default function AdminDashboard() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-display font-semibold text-lg text-white">
+                <h2 className="font-display font-semibold text-lg text-ink">
                   Team Member Requests ({teamRequestsList.length})
                 </h2>
                 <p className="text-xs text-ink-muted">
@@ -1623,7 +1661,7 @@ export default function AdminDashboard() {
             {teamRequestsList.length === 0 ? (
               <div className="glass-card p-12 text-center space-y-2">
                 <UserPlus size={32} className="text-ink-faint mx-auto" />
-                <p className="font-display text-sm font-semibold text-white">
+                <p className="font-display text-sm font-semibold text-ink">
                   No pending requests
                 </p>
                 <p className="text-xs text-ink-muted">
@@ -1641,7 +1679,7 @@ export default function AdminDashboard() {
                             <User size={14} className="text-violet-soft" />
                           </div>
                           <div>
-                            <p className="font-medium text-white text-sm">
+                            <p className="font-medium text-ink text-sm">
                               {request.users?.email || 'Unknown User'}
                             </p>
                             <p className="text-xs text-ink-faint">
@@ -1708,7 +1746,7 @@ export default function AdminDashboard() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-display font-semibold text-lg text-white">
+                <h2 className="font-display font-semibold text-lg text-ink">
                   Messages Inbox ({messagesList.length})
                 </h2>
                 <p className="text-xs text-ink-muted">
@@ -1720,7 +1758,7 @@ export default function AdminDashboard() {
             {messagesList.length === 0 ? (
               <div className="glass-card p-12 text-center space-y-2">
                 <Inbox size={32} className="text-ink-faint mx-auto" />
-                <p className="font-display text-sm font-semibold text-white">
+                <p className="font-display text-sm font-semibold text-ink">
                   No messages yet
                 </p>
                 <p className="text-xs text-ink-muted">
@@ -1741,7 +1779,7 @@ export default function AdminDashboard() {
                         <span
                           className={`h-2 w-2 rounded-full ${msg.read ? 'bg-ink-faint' : 'bg-cyan animate-pulse'}`}
                         />
-                        <span className="font-semibold text-white text-xs sm:text-sm">{msg.name}</span>
+                        <span className="font-semibold text-ink text-xs sm:text-sm">{msg.name}</span>
                         <span className="text-[11px] text-ink-faint font-mono">({msg.email})</span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1750,7 +1788,7 @@ export default function AdminDashboard() {
                         </span>
                         <button
                           onClick={() => handleToggleRead(msg.id, msg.read)}
-                          className="p-1 rounded-md border border-line text-ink-muted hover:text-white"
+                          className="p-1 rounded-md border border-line text-ink-muted hover:text-ink"
                           title={msg.read ? 'Mark Unread' : 'Mark Read'}
                         >
                           <Check size={12} />
@@ -1780,7 +1818,7 @@ export default function AdminDashboard() {
         {activeTab === 'analytics' && (
           <div className="space-y-6">
             <div className="glass-card p-5 sm:p-6 space-y-4">
-              <h3 className="font-display font-semibold text-base sm:text-lg text-white">
+              <h3 className="font-display font-semibold text-base sm:text-lg text-ink">
                 Content Engagement Overview
               </h3>
               <p className="text-xs sm:text-sm text-ink-muted">
@@ -1790,7 +1828,7 @@ export default function AdminDashboard() {
               <div className="grid sm:grid-cols-3 gap-4 pt-4 border-t border-line/60">
                 <div className="glass-card p-4 text-center">
                   <p className="text-[11px] text-ink-faint uppercase font-mono">Total Prompts</p>
-                  <p className="font-display text-2xl font-bold text-white mt-1">{stats.totalPrompts}</p>
+                  <p className="font-display text-2xl font-bold text-ink mt-1">{stats.totalPrompts}</p>
                 </div>
                 <div className="glass-card p-4 text-center">
                   <p className="text-[11px] text-ink-faint uppercase font-mono">Prompt Copies</p>
@@ -1811,7 +1849,7 @@ export default function AdminDashboard() {
         {activeTab === 'profile' && (
           <div className="max-w-xl space-y-6">
             <div className="glass-card p-5 sm:p-6 space-y-4">
-              <h3 className="font-display font-semibold text-base sm:text-lg text-white">
+              <h3 className="font-display font-semibold text-base sm:text-lg text-ink">
                 Security & Password
               </h3>
               <p className="text-xs text-ink-muted">
@@ -1827,7 +1865,7 @@ export default function AdminDashboard() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-xs text-white focus:border-violet focus:outline-none"
+                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-xs text-ink focus:border-violet focus:outline-none"
                   />
                 </div>
 
@@ -1839,7 +1877,7 @@ export default function AdminDashboard() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-xs text-white focus:border-violet focus:outline-none"
+                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-xs text-ink focus:border-violet focus:outline-none"
                   />
                 </div>
 
@@ -1864,7 +1902,7 @@ export default function AdminDashboard() {
           <div className="glass-card w-full max-w-3xl my-8 p-5 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-line pb-4">
               <div>
-                <h3 className="font-display font-semibold text-lg text-white">
+                <h3 className="font-display font-semibold text-lg text-ink">
                   {editingPromptId ? 'Edit Prompt' : 'Create New Prompt'}
                 </h3>
                 <p className="text-xs text-ink-muted mt-0.5">
@@ -1875,7 +1913,7 @@ export default function AdminDashboard() {
               </div>
               <button
                 onClick={() => setShowPromptModal(false)}
-                className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-white"
+                className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-ink"
               >
                 <X size={16} />
               </button>
@@ -1903,7 +1941,7 @@ export default function AdminDashboard() {
                     value={promptForm.title}
                     onChange={(e) => handleAutoSlug(e.target.value)}
                     placeholder="e.g. High-Converting Facebook Ad Copy"
-                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink focus:border-violet focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1914,7 +1952,7 @@ export default function AdminDashboard() {
                     value={promptForm.slug}
                     onChange={(e) => setPromptForm({ ...promptForm, slug: e.target.value })}
                     placeholder="e.g. high-converting-facebook-ad-copy"
-                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white font-mono focus:border-violet focus:outline-none"
+                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink font-mono focus:border-violet focus:outline-none"
                   />
                 </div>
               </div>
@@ -1930,7 +1968,7 @@ export default function AdminDashboard() {
                     value={promptForm.categoryId}
                     onChange={(e) => setPromptForm({ ...promptForm, categoryId: e.target.value, subcategoryId: '' })}
                     aria-label="Select prompt category"
-                    className={`w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-white focus:border-violet focus:outline-none ${
+                    className={`w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-ink focus:border-violet focus:outline-none ${
                       isCategoryAdmin ? 'opacity-70 cursor-not-allowed' : ''
                     }`}
                   >
@@ -1948,7 +1986,7 @@ export default function AdminDashboard() {
                     value={promptForm.subcategoryId}
                     onChange={(e) => setPromptForm({ ...promptForm, subcategoryId: e.target.value })}
                     aria-label="Select prompt subcategory"
-                    className="w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                    className="w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-ink focus:border-violet focus:outline-none"
                   >
                     <option value="">None / General</option>
                     {subcategoriesList.map((s) => (
@@ -1968,7 +2006,7 @@ export default function AdminDashboard() {
                   value={promptForm.tags}
                   onChange={(e) => setPromptForm({ ...promptForm, tags: e.target.value })}
                   placeholder="marketing, ads, facebook, copywriting"
-                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink focus:border-violet focus:outline-none"
                 />
               </div>
 
@@ -1980,7 +2018,7 @@ export default function AdminDashboard() {
                   value={promptForm.description}
                   onChange={(e) => setPromptForm({ ...promptForm, description: e.target.value })}
                   placeholder="A short overview of what this prompt accomplishes..."
-                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none leading-relaxed"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink focus:border-violet focus:outline-none leading-relaxed"
                 />
               </div>
 
@@ -2000,7 +2038,7 @@ export default function AdminDashboard() {
                   value={promptForm.prompt}
                   onChange={(e) => setPromptForm({ ...promptForm, prompt: e.target.value })}
                   placeholder="You are an expert copywriter. Write a Facebook ad for {{BusinessName}} targeting {{Audience}}..."
-                  className="w-full rounded-xl border border-line bg-surface/50 p-3 text-white font-mono text-xs focus:border-violet focus:outline-none leading-relaxed"
+                  className="w-full rounded-xl border border-line bg-surface/50 p-3 text-ink font-mono text-xs focus:border-violet focus:outline-none leading-relaxed"
                 />
               </div>
 
@@ -2008,7 +2046,7 @@ export default function AdminDashboard() {
               <div className="rounded-2xl border border-line bg-surface/40 p-4 space-y-3.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-display font-semibold text-sm text-white flex items-center gap-2">
+                    <h4 className="font-display font-semibold text-sm text-ink flex items-center gap-2">
                       <ImageIcon size={15} className="text-cyan" /> Multi-Image Gallery & Media Sources
                     </h4>
                     <p className="text-[11px] text-ink-muted mt-0.5">
@@ -2028,7 +2066,7 @@ export default function AdminDashboard() {
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                       imageSourceTab === 'github'
                         ? 'bg-violet/20 text-violet-soft border border-violet/40'
-                        : 'text-ink-muted hover:text-white'
+                        : 'text-ink-muted hover:text-ink'
                     }`}
                   >
                     GitHub Upload
@@ -2039,7 +2077,7 @@ export default function AdminDashboard() {
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                       imageSourceTab === 'drive'
                         ? 'bg-violet/20 text-violet-soft border border-violet/40'
-                        : 'text-ink-muted hover:text-white'
+                        : 'text-ink-muted hover:text-ink'
                     }`}
                   >
                     Google Drive Link
@@ -2050,7 +2088,7 @@ export default function AdminDashboard() {
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                       imageSourceTab === 'url'
                         ? 'bg-violet/20 text-violet-soft border border-violet/40'
-                        : 'text-ink-muted hover:text-white'
+                        : 'text-ink-muted hover:text-ink'
                     }`}
                   >
                     Direct Image URL
@@ -2062,7 +2100,7 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <label className="flex flex-col items-center justify-center border-2 border-dashed border-line/80 hover:border-violet/50 rounded-xl p-4 cursor-pointer bg-white/[0.01] hover:bg-white/[0.03] transition-all">
                       <CloudUpload size={22} className="text-violet-soft mb-1" />
-                      <span className="text-xs text-white font-medium">Click to upload image to GitHub</span>
+                      <span className="text-xs text-ink font-medium">Click to upload image to GitHub</span>
                       <span className="text-[10px] text-ink-faint">PNG, JPG, WebP up to 5MB</span>
                       <input
                         type="file"
@@ -2090,7 +2128,7 @@ export default function AdminDashboard() {
                       value={driveUrlInput}
                       onChange={(e) => setDriveUrlInput(e.target.value)}
                       placeholder="Paste Google Drive share link (e.g. https://drive.google.com/file/d/...)"
-                      className="flex-1 rounded-xl border border-line bg-surface/50 px-3 py-2 text-xs text-white focus:border-violet focus:outline-none"
+                      className="flex-1 rounded-xl border border-line bg-surface/50 px-3 py-2 text-xs text-ink focus:border-violet focus:outline-none"
                     />
                     <button
                       type="button"
@@ -2110,7 +2148,7 @@ export default function AdminDashboard() {
                       value={directUrlInput}
                       onChange={(e) => setDirectUrlInput(e.target.value)}
                       placeholder="https://images.unsplash.com/photo-..."
-                      className="flex-1 rounded-xl border border-line bg-surface/50 px-3 py-2 text-xs text-white focus:border-violet focus:outline-none"
+                      className="flex-1 rounded-xl border border-line bg-surface/50 px-3 py-2 text-xs text-ink focus:border-violet focus:outline-none"
                     />
                     <button
                       type="button"
@@ -2141,7 +2179,6 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                {/* Attached Images Grid */}
                 {promptForm.images.length > 0 && (
                   <div className="space-y-2 pt-2">
                     <p className="text-[10px] font-mono uppercase text-ink-faint font-semibold">
@@ -2169,7 +2206,7 @@ export default function AdminDashboard() {
                                 type="button"
                                 onClick={() => handleSetFeaturedImage(idx)}
                                 className={`p-1 rounded ${
-                                  img.isFeatured ? 'text-amber' : 'text-ink-faint hover:text-white'
+                                  img.isFeatured ? 'text-amber' : 'text-ink-faint hover:text-ink'
                                 }`}
                                 title={img.isFeatured ? 'Featured Cover Image' : 'Set as Featured Cover'}
                               >
@@ -2258,19 +2295,19 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="glass-card w-full max-w-md p-6 space-y-4 border-red-500/30">
             <div className="flex items-center justify-between border-b border-line pb-3">
-              <h3 className="font-display font-semibold text-base text-white flex items-center gap-2">
+              <h3 className="font-display font-semibold text-base text-ink flex items-center gap-2">
                 <XCircle size={18} className="text-red-400" /> Reject Prompt Submission
               </h3>
               <button
                 onClick={() => setRejectModal({ show: false, promptId: null, promptTitle: '', reason: '' })}
-                className="p-1 text-ink-muted hover:text-white"
+                className="p-1 text-ink-muted hover:text-ink"
               >
                 <X size={15} />
               </button>
             </div>
 
             <p className="text-xs text-ink-muted leading-relaxed">
-              Rejecting <strong className="text-white">"{rejectModal.promptTitle}"</strong>. Provide optional feedback so the Category Admin can correct and resubmit.
+              Rejecting <strong className="text-ink">"{rejectModal.promptTitle}"</strong>. Provide optional feedback so the Category Admin can correct and resubmit.
             </p>
 
             <form onSubmit={handleConfirmReject} className="space-y-3.5 text-xs">
@@ -2281,7 +2318,7 @@ export default function AdminDashboard() {
                   value={rejectModal.reason}
                   onChange={(e) => setRejectModal({ ...rejectModal, reason: e.target.value })}
                   placeholder="e.g. Please refine the variables and ensure prompt instructions are more detailed..."
-                  className="w-full rounded-xl border border-line bg-surface/50 p-3 text-white focus:border-red-400 focus:outline-none leading-relaxed"
+                  className="w-full rounded-xl border border-line bg-surface/50 p-3 text-ink focus:border-red-400 focus:outline-none leading-relaxed"
                 />
               </div>
 
@@ -2313,12 +2350,12 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="glass-card w-full max-w-md p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-line pb-3">
-              <h3 className="font-display font-semibold text-base text-white flex items-center gap-2">
+              <h3 className="font-display font-semibold text-base text-ink flex items-center gap-2">
                 <Users size={18} className="text-cyan" /> Invite / Create Admin User
               </h3>
               <button
                 onClick={() => setAdminModal({ ...adminModal, show: false })}
-                className="p-1 text-ink-muted hover:text-white"
+                className="p-1 text-ink-muted hover:text-ink"
               >
                 <X size={15} />
               </button>
@@ -2332,7 +2369,7 @@ export default function AdminDashboard() {
                   value={adminModal.displayName}
                   onChange={(e) => setAdminModal({ ...adminModal, displayName: e.target.value })}
                   placeholder="e.g. Amna Shakeel"
-                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink focus:border-violet focus:outline-none"
                 />
               </div>
 
@@ -2344,7 +2381,7 @@ export default function AdminDashboard() {
                   value={adminModal.email}
                   onChange={(e) => setAdminModal({ ...adminModal, email: e.target.value })}
                   placeholder="admin@example.com"
-                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink focus:border-violet focus:outline-none"
                 />
               </div>
 
@@ -2357,7 +2394,7 @@ export default function AdminDashboard() {
                   value={adminModal.password}
                   onChange={(e) => setAdminModal({ ...adminModal, password: e.target.value })}
                   placeholder="••••••••"
-                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink focus:border-violet focus:outline-none"
                 />
               </div>
 
@@ -2367,7 +2404,7 @@ export default function AdminDashboard() {
                   value={adminModal.role}
                   onChange={(e) => setAdminModal({ ...adminModal, role: e.target.value })}
                   aria-label="Select admin role"
-                  className="w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                  className="w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-ink focus:border-violet focus:outline-none"
                 >
                   <option value="category_admin">Category Admin (Scoped Access + Approvals)</option>
                   <option value="super_admin">Super Admin (Full Unrestricted Access)</option>
@@ -2382,7 +2419,7 @@ export default function AdminDashboard() {
                     value={adminModal.assignedCategoryId}
                     onChange={(e) => setAdminModal({ ...adminModal, assignedCategoryId: e.target.value })}
                     aria-label="Select assigned category for admin"
-                    className="w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                    className="w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-ink focus:border-violet focus:outline-none"
                   >
                     <option value="">Select a category...</option>
                     {categoriesList.map((c) => (
@@ -2422,12 +2459,12 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="glass-card w-full max-w-md p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-line pb-3">
-              <h3 className="font-display font-semibold text-base text-white">
+              <h3 className="font-display font-semibold text-base text-ink">
                 {editingCatId ? 'Edit Category' : 'New Category'}
               </h3>
               <button
                 onClick={() => setShowCatModal(false)}
-                className="p-1 text-ink-muted hover:text-white"
+                className="p-1 text-ink-muted hover:text-ink"
               >
                 <X size={15} />
               </button>
@@ -2446,7 +2483,7 @@ export default function AdminDashboard() {
                     setCatForm({ ...catForm, name, slug: editingCatId ? catForm.slug : slug })
                   }}
                   placeholder="e.g. Artificial Intelligence"
-                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white focus:border-violet focus:outline-none"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink focus:border-violet focus:outline-none"
                 />
               </div>
 
@@ -2458,7 +2495,7 @@ export default function AdminDashboard() {
                   value={catForm.slug}
                   onChange={(e) => setCatForm({ ...catForm, slug: e.target.value })}
                   placeholder="artificial-intelligence"
-                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-white font-mono focus:border-violet focus:outline-none"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink font-mono focus:border-violet focus:outline-none"
                 />
               </div>
 
@@ -2492,8 +2529,8 @@ function SidebarLink({ active, onClick, icon: Icon, label, badge, badgeColor = '
       onClick={onClick}
       className={`flex items-center justify-between w-full rounded-xl px-3 py-2 text-xs font-medium transition-all ${
         active
-          ? 'bg-violet/15 text-white border border-violet/30 shadow-glow'
-          : 'text-ink-muted hover:bg-white/[0.04] hover:text-white'
+          ? 'bg-violet/15 text-violet-soft border border-violet/30 shadow-glow font-semibold'
+          : 'text-ink-muted hover:bg-white/[0.04] hover:text-ink'
       }`}
     >
       <div className="flex items-center gap-2.5">
@@ -2535,7 +2572,7 @@ function StatCard({ title, value, icon: Icon, change, highlight = false }) {
         </span>
       </div>
       <div>
-        <p className={`font-display text-xl sm:text-2xl font-bold ${highlight ? 'text-amber' : 'text-white'}`}>
+        <p className={`font-display text-xl sm:text-2xl font-bold ${highlight ? 'text-amber' : 'text-ink'}`}>
           {value}
         </p>
         {change && <p className="text-[10px] sm:text-[11px] text-ink-faint mt-0.5">{change}</p>}

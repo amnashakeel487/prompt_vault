@@ -133,11 +133,11 @@ export default function PromptDetails() {
       />
 
       <nav className="mb-4 sm:mb-6 flex flex-wrap items-center gap-1.5 text-[11px] sm:text-xs text-ink-faint">
-        <Link to="/" className="hover:text-white transition-colors">Home</Link>
+        <Link to="/" className="hover:text-ink transition-colors">Home</Link>
         <ChevronRight size={12} />
         {category && (
           <>
-            <Link to={`/category/${category.slug}`} className="hover:text-white transition-colors">
+            <Link to={`/category/${category.slug}`} className="hover:text-ink transition-colors">
               {category.name}
             </Link>
             <ChevronRight size={12} />

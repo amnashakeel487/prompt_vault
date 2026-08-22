@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        base: {
+        canvas: {
           DEFAULT: 'var(--color-base)',
           soft: 'var(--color-base-soft)',
         },

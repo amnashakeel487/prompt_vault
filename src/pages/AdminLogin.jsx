@@ -45,7 +45,7 @@ export default function AdminLogin() {
         <div className="mb-5 sm:mb-6 text-center">
           <Link to="/" className="inline-flex items-center gap-2 mb-3 sm:mb-4">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet to-cyan shadow-glow">
-              <Zap size={18} className="text-base" strokeWidth={2.5} />
+              <Zap size={18} className="text-white" strokeWidth={2.5} />
             </span>
             <span className="font-display text-lg sm:text-xl font-semibold tracking-tight text-ink">
               PromptVault
@@ -95,7 +95,7 @@ export default function AdminLogin() {
           <div className="mt-5 sm:mt-6 pt-4 border-t border-line/60 text-center">
             <Link
               to="/"
-              className="inline-flex items-center gap-1.5 text-xs text-ink-muted hover:text-white transition-colors min-h-[36px]"
+              className="inline-flex items-center gap-1.5 text-xs text-ink-muted hover:text-ink transition-colors min-h-[36px]"
             >
               <ArrowLeft size={13} /> Back to PromptVault
             </Link>

@@ -72,8 +72,8 @@ export default function Navbar() {
       <div className="glass border-b border-line">
         <div className="section-pad flex h-14 sm:h-16 items-center justify-between gap-3">
           <Link to="/" className="flex items-center gap-2 shrink-0 min-h-[44px]">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-violet to-cyan shadow-glow">
-              <Zap size={16} className="text-base" strokeWidth={2.5} />
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-violet to-cyan shadow-glow text-white">
+              <Zap size={16} strokeWidth={2.5} />
             </span>
             <span className="font-display text-base sm:text-lg font-semibold tracking-tight text-ink">
               PromptVault
