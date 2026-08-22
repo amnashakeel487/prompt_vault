@@ -811,8 +811,8 @@ export default function AdminDashboard() {
   // --- TEAM MEMBER REQUEST HANDLERS ---
   async function handleApproveTeamRequest(requestId, userEmail, categoryId = null) {
     try {
-      await approveTeamMemberRequest(requestId, { assignedCategoryId: categoryId })
-      notify('success', `Team member request approved! ${userEmail} is now a category admin.`)
+      await approveTeamMemberRequest(requestId, categoryId)
+      notify('success', `Team member request approved! ${userEmail || 'User'} is now a Category Admin.`)
       await loadData()
     } catch (err) {
       console.error('Error approving team request:', err)
@@ -823,11 +823,11 @@ export default function AdminDashboard() {
   async function handleRejectTeamRequest(requestId, userEmail, reason = '') {
     try {
       await rejectTeamMemberRequest(requestId, reason)
-      notify('success', `Team member request from ${userEmail} has been rejected.`)
+      notify('success', `Team member request from ${userEmail || 'User'} has been rejected.`)
       await loadData()
     } catch (err) {
       console.error('Error rejecting team request:', err)
-      notify('error', 'Failed to reject team member request.')
+      notify('error', err.message || 'Failed to reject team member request.')
     }
   }
 

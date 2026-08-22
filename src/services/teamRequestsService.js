@@ -107,18 +107,78 @@ export async function getTeamMemberRequests({ status = null } = {}) {
  * Approve team member request
  */
 export async function approveTeamMemberRequest(requestId, assignedCategoryId = null) {
-  const { error } = await supabase.rpc('approve_team_member_request', {
-    request_id: requestId,
-    assigned_category_id: assignedCategoryId
-  })
+  if (!requestId) {
+    throw new Error('Request ID is required to approve team member.')
+  }
 
-  if (error) throw error
+  const categoryId = typeof assignedCategoryId === 'string' 
+    ? assignedCategoryId 
+    : assignedCategoryId?.assignedCategoryId || null
+
+  // 1. Try RPC call first if configured in Supabase
+  try {
+    const { error: rpcError } = await supabase.rpc('approve_team_member_request', {
+      request_id: requestId,
+      assigned_category_id: categoryId
+    })
+    if (!rpcError) return
+  } catch (err) {
+    console.warn('RPC approve_team_member_request not available, executing direct approval fallback:', err)
+  }
+
+  // 2. Direct fallback approval
+  // Fetch request record
+  const { data: request, error: fetchErr } = await supabase
+    .from('team_member_requests')
+    .select('*')
+    .eq('id', requestId)
+    .single()
+
+  if (fetchErr || !request) {
+    throw new Error(`Failed to locate request (${requestId}): ${fetchErr?.message || 'Request not found'}`)
+  }
+
+  const targetCategoryId = categoryId || request.requested_category_id || null
+  const targetUserId = request.user_id
+
+  // a. Update request status to approved
+  const { error: updateErr } = await supabase
+    .from('team_member_requests')
+    .update({ 
+      status: 'approved',
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', requestId)
+
+  if (updateErr) {
+    throw new Error(`Could not update request status: ${updateErr.message}`)
+  }
+
+  // b. Create category_admin profile in admin_profiles table
+  const displayName = request.user_email ? request.user_email.split('@')[0] : 'Team Member'
+  const { error: profileErr } = await supabase
+    .from('admin_profiles')
+    .upsert({
+      id: targetUserId,
+      role: 'category_admin',
+      assigned_category_id: targetCategoryId,
+      display_name: displayName,
+      created_at: new Date().toISOString()
+    })
+
+  if (profileErr) {
+    throw new Error(`Request marked approved, but creating admin profile failed: ${profileErr.message}. Ensure RLS policy allows super_admin to insert into admin_profiles.`)
+  }
 }
 
 /**
  * Reject team member request
  */
-export async function rejectTeamMemberRequest(requestId) {
+export async function rejectTeamMemberRequest(requestId, reason = '') {
+  if (!requestId) {
+    throw new Error('Request ID is required to reject team member.')
+  }
+
   const { error } = await supabase
     .from('team_member_requests')
     .update({ 
@@ -127,7 +187,9 @@ export async function rejectTeamMemberRequest(requestId) {
     })
     .eq('id', requestId)
 
-  if (error) throw error
+  if (error) {
+    throw new Error(`Failed to reject request: ${error.message}`)
+  }
 }
 
 /**

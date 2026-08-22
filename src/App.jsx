@@ -17,6 +17,7 @@ const SearchResults = lazy(() => import('./pages/SearchResults'))
 const Latest = lazy(() => import('./pages/Latest'))
 const Popular = lazy(() => import('./pages/Popular'))
 const AdminLogin = lazy(() => import('./pages/AdminLogin'))
+const SystemLogin = lazy(() => import('./pages/SystemLogin'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const UserAccount = lazy(() => import('./pages/UserAccount'))
 const NotFound = lazy(() => import('./pages/NotFound'))
@@ -47,7 +48,7 @@ function PageTransition({ children }) {
 
 export default function App() {
   const location = useLocation()
-  const isAdminRoute = location.pathname.startsWith('/admin')
+  const isAdminRoute = location.pathname.startsWith('/admin') || location.pathname.startsWith('/system-access')
 
   return (
     <AuthProvider>
@@ -68,6 +69,7 @@ export default function App() {
                     <Route path="/popular" element={<PageTransition><Popular /></PageTransition>} />
                     <Route path="/account" element={<PageTransition><UserAccount /></PageTransition>} />
                     <Route path="/admin/login" element={<PageTransition><AdminLogin /></PageTransition>} />
+                    <Route path="/system-access/login" element={<PageTransition><SystemLogin /></PageTransition>} />
                     <Route
                       path="/admin/dashboard"
                       element={

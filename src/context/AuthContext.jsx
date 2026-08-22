@@ -5,10 +5,11 @@ const AuthContext = createContext({
   user: null,
   session: null,
   profile: null,
-  role: 'super_admin',
+  role: null,
   assignedCategoryId: null,
-  isSuperAdmin: true,
+  isSuperAdmin: false,
   isCategoryAdmin: false,
+  isAdmin: false,
   loading: true,
   signIn: async () => {},
   signOut: async () => {},
@@ -23,13 +24,13 @@ export function AuthProvider({ children }) {
   const isFetchingRef = useRef(false)
 
   // Fetch admin profile for the logged in user
-  const fetchProfile = useCallback(async (userId, userEmail = '') => {
+  const fetchProfile = useCallback(async (userId) => {
     if (!userId) {
       setProfile(null)
       return null
     }
 
-    if (isFetchingRef.current) return
+    if (isFetchingRef.current) return null
     isFetchingRef.current = true
 
     try {
@@ -39,49 +40,17 @@ export function AuthProvider({ children }) {
         .eq('id', userId)
         .maybeSingle()
 
-      if (error) {
-        console.warn('Could not fetch admin profile:', error.message)
-        const fallbackProfile = {
-          id: userId,
-          role: 'super_admin',
-          assigned_category_id: null,
-          display_name: 'Admin',
-        }
-        setProfile((prev) => (prev?.id === userId && prev?.role === 'super_admin' ? prev : fallbackProfile))
-        return fallbackProfile
+      if (error || !data) {
+        setProfile(null)
+        return null
       }
 
-      if (data) {
-        setProfile(data)
-        return data
-      } else {
-        const defaultProfile = {
-          id: userId,
-          role: 'super_admin',
-          assigned_category_id: null,
-          display_name: userEmail ? userEmail.split('@')[0] : 'Super Admin',
-        }
-        setProfile((prev) => (prev?.id === userId ? prev : defaultProfile))
-
-        // Attempt silent insert for bootstrap profile without blocking
-        supabase
-          .from('admin_profiles')
-          .insert([defaultProfile])
-          .then(() => {})
-          .catch(() => {})
-
-        return defaultProfile
-      }
+      setProfile(data)
+      return data
     } catch (err) {
       console.warn('Error fetching admin profile:', err)
-      const fallback = {
-        id: userId,
-        role: 'super_admin',
-        assigned_category_id: null,
-        display_name: 'Admin',
-      }
-      setProfile((prev) => (prev?.id === userId ? prev : fallback))
-      return fallback
+      setProfile(null)
+      return null
     } finally {
       isFetchingRef.current = false
     }
@@ -97,7 +66,9 @@ export function AuthProvider({ children }) {
       const currentUser = session?.user ?? null
       setUser(currentUser)
       if (currentUser) {
-        await fetchProfile(currentUser.id, currentUser.email)
+        await fetchProfile(currentUser.id)
+      } else {
+        setProfile(null)
       }
       if (isMounted) setLoading(false)
     })
@@ -109,7 +80,7 @@ export function AuthProvider({ children }) {
       const currentUser = newSession?.user ?? null
       setUser(currentUser)
       if (currentUser) {
-        await fetchProfile(currentUser.id, currentUser.email)
+        await fetchProfile(currentUser.id)
       } else {
         setProfile(null)
       }
@@ -129,7 +100,7 @@ export function AuthProvider({ children }) {
     })
     if (error) throw error
     if (data.user) {
-      await fetchProfile(data.user.id, data.user.email)
+      await fetchProfile(data.user.id)
     }
     return data
   }
@@ -144,13 +115,14 @@ export function AuthProvider({ children }) {
 
   const refreshProfile = async () => {
     if (user?.id) {
-      return await fetchProfile(user.id, user.email)
+      return await fetchProfile(user.id)
     }
   }
 
-  const role = profile?.role || 'super_admin'
+  const role = profile?.role || null
   const isSuperAdmin = role === 'super_admin'
   const isCategoryAdmin = role === 'category_admin'
+  const isAdmin = Boolean(profile && (isSuperAdmin || isCategoryAdmin))
   const assignedCategoryId = profile?.assigned_category_id || null
 
   const value = {
@@ -161,11 +133,12 @@ export function AuthProvider({ children }) {
     assignedCategoryId,
     isSuperAdmin,
     isCategoryAdmin,
+    isAdmin,
     loading,
     signIn,
     signOut,
     refreshProfile,
-    isAuthenticated: Boolean(session && user),
+    isAuthenticated: Boolean(session && user && isAdmin),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
