@@ -10,12 +10,16 @@ export async function submitTeamMemberRequest({ requestedCategoryId, message }) 
   }
 
   // Check if user already has a pending request
-  const { data: existing } = await supabase
+  const { data: existing, error: checkErr } = await supabase
     .from('team_member_requests')
     .select('id, status')
     .eq('user_id', user.id)
     .in('status', ['pending', 'approved'])
-    .single()
+    .maybeSingle()
+
+  if (checkErr && (checkErr.code === '42P01' || checkErr.message?.includes('schema cache'))) {
+    throw new Error('Database table "team_member_requests" is not created in Supabase yet. Please run the SQL script provided in your Supabase SQL Editor.')
+  }
 
   if (existing) {
     if (existing.status === 'approved') {
@@ -33,9 +37,14 @@ export async function submitTeamMemberRequest({ requestedCategoryId, message }) 
       status: 'pending'
     }])
     .select()
-    .single()
+    .maybeSingle()
 
-  if (error) throw error
+  if (error) {
+    if (error.code === '42P01' || error.message?.includes('schema cache')) {
+      throw new Error('Database table "team_member_requests" is not created in Supabase yet. Please run the SQL script provided in your Supabase SQL Editor.')
+    }
+    throw error
+  }
   return data
 }
 
@@ -43,30 +52,20 @@ export async function submitTeamMemberRequest({ requestedCategoryId, message }) 
  * Get team member requests (super admin only)
  */
 export async function getTeamMemberRequests() {
-  const { data, error } = await supabase
-    .from('team_member_requests')
-    .select(`
-      *,
-      categories(name),
-      user_email:user_id
-    `)
-    .order('created_at', { ascending: false })
+  try {
+    const { data, error } = await supabase
+      .from('team_member_requests')
+      .select(`
+        *,
+        categories(name)
+      `)
+      .order('created_at', { ascending: false })
 
-  if (error) throw error
-
-  // Fetch user emails separately since we can't join auth.users directly
-  const userIds = data?.map(req => req.user_id) || []
-  const { data: users } = await supabase.auth.admin.listUsers()
-  
-  const userEmailMap = {}
-  users?.users?.forEach(user => {
-    userEmailMap[user.id] = user.email
-  })
-
-  return (data || []).map(request => ({
-    ...request,
-    user_email: userEmailMap[request.user_id] || 'Unknown'
-  }))
+    if (error) return []
+    return data || []
+  } catch {
+    return []
+  }
 }
 
 /**
@@ -100,14 +99,19 @@ export async function rejectTeamMemberRequest(requestId) {
  * Get user's own request status
  */
 export async function getUserRequestStatus(userId) {
-  const { data, error } = await supabase
-    .from('team_member_requests')
-    .select('*, categories(name)')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
+  if (!userId) return null
+  try {
+    const { data, error } = await supabase
+      .from('team_member_requests')
+      .select('*, categories(name)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-  if (error && error.code !== 'PGRST116') throw error // PGRST116 is "not found"
-  return data
+    if (error) return null
+    return data
+  } catch {
+    return null
+  }
 }
