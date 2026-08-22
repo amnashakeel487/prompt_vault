@@ -49,13 +49,8 @@ export function AuthProvider({ children }) {
       }
 
       // If no admin profile found, user is not an admin
-      if (!data) {
-        setProfile(null)
-        return null
-      }
-
-      setProfile(data)
-      return data
+      setProfile(data || null)
+      return data || null
     } catch (err) {
       console.warn('Error fetching admin profile:', err)
       setProfile(null)
@@ -64,7 +59,7 @@ export function AuthProvider({ children }) {
       isFetchingRef.current = false
       setProfileLoading(false)
     }
-  }, [profile])
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -172,14 +167,16 @@ export function AuthProvider({ children }) {
   const isAdmin = Boolean(profile && (isSuperAdmin || isCategoryAdmin))
   const assignedCategoryId = profile?.assigned_category_id || null
 
-  // User is authenticated if they have a session AND either:
-  // 1. Profile is still loading (give benefit of doubt during loading)
-  // 2. They have an admin profile  
-  // 3. They have a valid session but profile fetch is still pending
+  // User is authenticated for admin access if:
+  // 1. They have a valid session that hasn't expired
+  // 2. They have a user object 
+  // 3. Either profile is still loading OR they have an admin profile
   const isAuthenticated = Boolean(
     session && 
     user && 
-    (profileLoading || isAdmin || (session.expires_at && new Date(session.expires_at * 1000) > new Date()))
+    session.expires_at && 
+    new Date(session.expires_at * 1000) > new Date() &&
+    (profileLoading || isAdmin)
   )
 
   const value = {
