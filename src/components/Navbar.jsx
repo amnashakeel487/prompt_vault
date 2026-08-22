@@ -35,7 +35,7 @@ export default function Navbar() {
   })
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, signOut } = usePublicAuth()
+  const { user, isCategoryAdmin, signOut } = usePublicAuth()
 
   const isHome = location.pathname === '/'
 
@@ -117,6 +117,15 @@ export default function Navbar() {
             {/* User Menu */}
             {user ? (
               <div className="hidden md:flex items-center gap-2">
+                {isCategoryAdmin && (
+                  <Link
+                    to="/team/dashboard"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-violet-soft bg-violet/10 border border-violet/30 hover:bg-violet/20 hover:border-violet/50 transition-all shadow-glow"
+                  >
+                    <Zap size={13} className="text-cyan" />
+                    Team Dashboard
+                  </Link>
+                )}
                 <Link
                   to="/account"
                   className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-ink-muted hover:text-ink hover:bg-white/[0.05] transition-colors"
@@ -186,6 +195,16 @@ export default function Navbar() {
 
                 {user ? (
                   <div className="flex items-center gap-3">
+                    {isCategoryAdmin && (
+                      <Link
+                        to="/team/dashboard"
+                        onClick={() => setOpen(false)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-violet-soft bg-violet/10 border border-violet/30"
+                      >
+                        <Zap size={13} className="text-cyan" />
+                        Dashboard
+                      </Link>
+                    )}
                     <Link
                       to="/account"
                       onClick={() => setOpen(false)}

@@ -4,13 +4,13 @@ import { useForm } from 'react-hook-form'
 import { Lock, Mail, Loader2, ArrowLeft, Zap, Users } from 'lucide-react'
 import SEO from '../components/SEO'
 import { supabase } from '../services/supabaseClient'
-import { useAuth } from '../hooks/useAuth'
+import { usePublicAuth } from '../context/PublicAuthContext'
 
 export default function AdminLogin() {
   const { register, handleSubmit } = useForm()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { refreshProfile } = useAuth()
+  const { refreshProfile } = usePublicAuth()
   const navigate = useNavigate()
 
   async function onSubmit(data) {

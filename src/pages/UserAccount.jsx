@@ -4,15 +4,13 @@ import { User, Mail, LogOut, Heart, Send, AlertCircle, CheckCircle2, Users, Shie
 import SEO from '../components/SEO'
 import PromptCard from '../components/PromptCard'
 import { usePublicAuth } from '../context/PublicAuthContext'
-import { useAuth } from '../hooks/useAuth'
 import { getUserFavorites } from '../services/favoritesService'
 import { getUserRequestStatus, submitTeamMemberRequest } from '../services/teamRequestsService'
 import { getCategories } from '../services/promptService'
 import { formatPrompt } from '../services/promptService'
 
 export default function UserAccount() {
-  const { user, signOut, isCategoryAdmin, refreshProfile } = usePublicAuth()
-  const { isSuperAdmin } = useAuth()
+  const { user, signOut, isCategoryAdmin, assignedCategoryName, refreshProfile } = usePublicAuth()
   const navigate = useNavigate()
   const [favorites, setFavorites] = useState([])
   const [categories, setCategories] = useState([])
@@ -154,22 +152,6 @@ export default function UserAccount() {
             
             {loading.teamRequest ? (
               <div className="text-ink-muted text-sm">Loading...</div>
-            ) : isSuperAdmin ? (
-              <div className="p-4 rounded-xl border border-violet/30 bg-violet/10">
-                <div className="flex items-center gap-2 mb-2">
-                  <ShieldCheck size={18} className="text-violet-soft" />
-                  <span className="font-medium text-violet-soft">Super Admin Account</span>
-                </div>
-                <p className="text-sm text-ink-muted mb-3">
-                  You have full system oversight and administrative permissions.
-                </p>
-                <Link 
-                  to="/admin/dashboard" 
-                  className="inline-flex items-center gap-1.5 btn-primary !py-2 !px-4 text-xs"
-                >
-                  Go to Admin Dashboard →
-                </Link>
-              </div>
             ) : isCategoryAdmin || (teamRequest && teamRequest.status === 'approved') ? (
               <div className="p-4 rounded-xl border border-green-500/30 bg-green-500/10">
                 <div className="flex items-center gap-2 mb-3">
@@ -183,7 +165,7 @@ export default function UserAccount() {
                   <li>• Create and submit new prompts for review</li>
                   <li>• Manage your submitted prompts</li>
                   <li>• Track approval status and feedback</li>
-                  <li>• Contribute to the {teamRequest?.categories?.name || 'assigned'} category</li>
+                  <li>• Contribute to the {assignedCategoryName || teamRequest?.categories?.name || 'assigned'} category</li>
                 </ul>
                 <Link 
                   to="/team/dashboard" 
