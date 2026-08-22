@@ -32,8 +32,18 @@ export default function PublicAuthModal({ isOpen, onClose, defaultMode = 'signin
         if (password.length < 6) {
           throw new Error('Password must be at least 6 characters')
         }
-        await signUp({ email, password })
-        setMessage('Please check your email to confirm your account!')
+        const data = await signUp({ email, password })
+        if (data?.session) {
+          onClose()
+        } else {
+          // If session wasn't auto-returned, attempt direct sign in
+          try {
+            await signIn({ email, password })
+            onClose()
+          } catch {
+            onClose()
+          }
+        }
       } else if (mode === 'reset') {
         await sendPasswordReset(email)
         setMessage('Password reset email sent! Check your inbox.')
