@@ -1,5 +1,26 @@
-import { supabase } from './supabaseClient'
+import { supabase as publicSupabase } from './supabaseClient'
+import { supabaseSystem } from './supabaseSystemClient'
 import { formatGoogleDriveImageUrl, detectImageSource } from '../utils/googleDrive'
+
+function getActiveClient() {
+  if (
+    typeof window !== 'undefined' &&
+    (window.localStorage.getItem('pv-system-auth') ||
+      window.localStorage.getItem('pv-system-auth-flag') ||
+      window.sessionStorage.getItem('pv-system-auth'))
+  ) {
+    return supabaseSystem
+  }
+  return publicSupabase
+}
+
+const supabase = new Proxy({}, {
+  get(target, prop) {
+    const client = getActiveClient()
+    const val = client[prop]
+    return typeof val === 'function' ? val.bind(client) : val
+  }
+})
 
 /**
  * Normalizes a prompt record from Supabase (snake_case) to match frontend properties (camelCase + snake_case).
