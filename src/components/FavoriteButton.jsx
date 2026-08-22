@@ -16,17 +16,13 @@ export default function FavoriteButton({
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (isAuthenticated && user?.id) {
-      checkFavoriteStatus()
-    } else {
-      setIsFavorited(false)
-    }
+    checkFavoriteStatus()
   }, [isAuthenticated, user?.id, promptId])
 
   const checkFavoriteStatus = async () => {
     try {
-      const status = await getUserFavoriteStatus(user.id, [promptId])
-      setIsFavorited(status[promptId] || false)
+      const status = await getUserFavoriteStatus(user?.id, [promptId])
+      setIsFavorited(Boolean(status[promptId]))
     } catch (err) {
       console.error('Error checking favorite status:', err)
     }
@@ -36,8 +32,8 @@ export default function FavoriteButton({
     e.preventDefault()
     e.stopPropagation()
 
-    if (!isAuthenticated) {
-      onAuthRequired?.()
+    if (!isAuthenticated && onAuthRequired) {
+      onAuthRequired()
       return
     }
 
@@ -51,6 +47,7 @@ export default function FavoriteButton({
       setCount(prev => result.favorited ? prev + 1 : Math.max(0, prev - 1))
     } catch (err) {
       console.error('Error toggling favorite:', err)
+      setIsFavorited(prev => !prev)
     } finally {
       setLoading(false)
     }

@@ -181,8 +181,8 @@ export default function PromptDetails() {
               <div className="ml-auto">
                 <FavoriteButton 
                   promptId={prompt.id} 
-                  initialFavorited={false} 
-                  showAuthModal={() => setShowAuthModal(true)} 
+                  initialCount={prompt.favoritesCount || prompt.favorites_count || 0}
+                  onAuthRequired={() => setShowAuthModal(true)} 
                 />
               </div>
             </div>
