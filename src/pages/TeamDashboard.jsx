@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { 
   User, LogOut, Plus, Eye, Clock, CheckCircle, XCircle, Edit3, 
-  Tag, FileText, Image, AlertCircle, Save, X, Menu, Home, BarChart3,
+  Tag, FileText, Image as ImageIcon, AlertCircle, Save, X, Menu, Home, BarChart3,
   TrendingUp, Zap, RefreshCw, Copy, Sun, Moon, Settings, HelpCircle,
-  Layers, PenTool
+  Layers, PenTool, CloudUpload, Loader2, Star, Trash2, AlertTriangle
 } from 'lucide-react'
 import SEO from '../components/SEO'
 import { usePublicAuth } from '../context/PublicAuthContext'
@@ -22,16 +22,145 @@ export default function TeamDashboard() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingPrompt, setEditingPrompt] = useState(null)
   const [categories, setCategories] = useState([])
+  const [subcategoriesList, setSubcategoriesList] = useState([])
   const [formData, setFormData] = useState({
     title: '',
+    slug: '',
+    categoryId: assignedCategoryId || '', // Team member locked to assigned category
+    subcategoryId: '',
+    tags: '',
     description: '',
     prompt: '',
-    tags: [],
-    tagInput: '',
-    image: null,
+    featuredImage: '',
+    outputImage: '',
+    images: [],
     seoTitle: '',
-    seoDescription: ''
+    seoDescription: '',
+    featured: false,
+    popular: false,
+    trending: false,
+    status: 'pending_review', // Team members always submit for review
+    rejectionReason: '',
+    contentType: 'prompt',
+    videoUrl: '',
   })
+
+  // Multi-Image Form Tab & Inputs  
+  const [imageSourceTab, setImageSourceTab] = useState('github')
+  const [driveUrlInput, setDriveUrlInput] = useState('')
+  const [directUrlInput, setDirectUrlInput] = useState('')
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+
+  // Helper function to generate URL slug from title
+  const handleAutoSlug = (title) => {
+    const slug = title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+    setFormData((prev) => ({ ...prev, title, slug: prev.slug && editingPrompt ? prev.slug : slug }))
+  }
+
+  // Google Drive link conversion helper
+  const convertGoogleDriveUrl = (shareUrl) => {
+    const match = shareUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
+    return match ? `https://drive.google.com/uc?export=view&id=${match[1]}` : shareUrl
+  }
+
+  // Add Google Drive image
+  const handleAddDriveImage = () => {
+    const trimmed = driveUrlInput.trim()
+    if (!trimmed) return
+    
+    const converted = convertGoogleDriveUrl(trimmed)
+    const newImg = {
+      imageUrl: converted,
+      source: 'google_drive',
+      isFeatured: formData.images.length === 0,
+      sortOrder: formData.images.length,
+    }
+    
+    setFormData((prev) => {
+      const nextImages = [...prev.images, newImg]
+      return { ...prev, images: nextImages }
+    })
+    setDriveUrlInput('')
+  }
+
+  // Add direct URL image
+  const handleAddDirectImage = () => {
+    const url = directUrlInput.trim()
+    if (!url) return
+    
+    const newImg = {
+      imageUrl: url,
+      source: 'direct_url',
+      isFeatured: formData.images.length === 0,
+      sortOrder: formData.images.length,
+    }
+    
+    setFormData((prev) => {
+      const nextImages = [...prev.images, newImg]
+      return { ...prev, images: nextImages }
+    })
+    setDirectUrlInput('')
+  }
+
+  // Set featured image
+  const handleSetFeaturedImage = (index) => {
+    setFormData((prev) => {
+      const updated = prev.images.map((img, i) => ({
+        ...img,
+        isFeatured: i === index,
+      }))
+      return { ...prev, images: updated }
+    })
+  }
+
+  // Remove image
+  const handleRemoveImage = (index) => {
+    setFormData((prev) => {
+      const updated = prev.images.filter((_, i) => i !== index)
+      if (updated.length > 0 && !updated.some((img) => img.isFeatured)) {
+        updated[0].isFeatured = true
+      }
+      return { ...prev, images: updated }
+    })
+  }
+
+  // Handle file upload to GitHub (simplified version)
+  const handleFileUpload = async (file) => {
+    if (!file || uploadingImage) return
+    
+    setUploadingImage(true)
+    setUploadError('')
+    
+    try {
+      // In a real implementation, this would upload to GitHub
+      // For now, we'll create a local URL as placeholder
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const newImg = {
+          imageUrl: e.target.result,
+          source: 'local', // In real implementation this would be 'github'
+          isFeatured: formData.images.length === 0,
+          sortOrder: formData.images.length,
+        }
+        
+        setFormData((prev) => {
+          const nextImages = [...prev.images, newImg]
+          return { ...prev, images: nextImages }
+        })
+        setUploadingImage(false)
+      }
+      reader.readAsDataURL(file)
+    } catch (error) {
+      setUploadError('Failed to upload image: ' + error.message)
+      setUploadingImage(false)
+    }
+  }
   const [isLoading, setIsLoading] = useState({
     prompts: true,
     submitting: false
@@ -76,6 +205,28 @@ export default function TeamDashboard() {
     }
   }, [isCategoryAdmin, assignedCategoryId])
 
+  // Load subcategories when form category changes
+  useEffect(() => {
+    async function fetchSubcategories() {
+      if (formData.categoryId) {
+        try {
+          const { data: subs, error } = await supabase
+            .from('subcategories')
+            .select('*')
+            .eq('category_id', formData.categoryId)
+            .order('name')
+
+          if (!error) {
+            setSubcategoriesList(subs || [])
+          }
+        } catch (err) {
+          console.warn('Error loading subcategories:', err)
+        }
+      }
+    }
+    fetchSubcategories()
+  }, [formData.categoryId])
+
   const loadData = async () => {
     if (!assignedCategoryId) return
 
@@ -117,6 +268,19 @@ export default function TeamDashboard() {
       if (categoriesError) throw categoriesError
       setCategories(categoriesData || [])
 
+      // Load subcategories for the assigned category
+      if (assignedCategoryId) {
+        const { data: subcategoriesData, error: subcategoriesError } = await supabase
+          .from('subcategories')
+          .select('*')
+          .eq('category_id', assignedCategoryId)
+          .order('name')
+
+        if (!subcategoriesError) {
+          setSubcategoriesList(subcategoriesData || [])
+        }
+      }
+
     } catch (err) {
       console.error('Error loading dashboard data:', err)
       setError('Failed to load dashboard data')
@@ -132,8 +296,8 @@ export default function TeamDashboard() {
     setIsLoading(prev => ({ ...prev, submitting: true }))
 
     try {
-      // Generate slug from title
-      const slug = formData.title
+      // Use the slug from form data (auto-generated by handleAutoSlug)
+      const slug = formData.slug || formData.title
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
@@ -143,30 +307,38 @@ export default function TeamDashboard() {
       // Parse variables from prompt
       const variables = extractVariables(formData.prompt)
 
-      // Handle image upload if provided
-      let imageUrl = null
-      if (formData.image) {
-        try {
-          imageUrl = await uploadImageToGitHub(formData.image)
-        } catch (imageErr) {
-          console.warn('Image upload failed, proceeding without image:', imageErr)
-        }
-      }
+      // Parse tags into array
+      const tagsArray = formData.tags
+        ? formData.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
+        : []
 
-      // Create prompt
+      // Handle featured image from images array
+      const featuredImage = formData.images.find(img => img.isFeatured)?.imageUrl || 
+                           formData.images[0]?.imageUrl || 
+                           null
+
+      // Create prompt with comprehensive data
       const promptData = {
         title: formData.title,
         slug: slug,
         description: formData.description,
         prompt: formData.prompt,
-        category_id: assignedCategoryId,
-        tags: formData.tags,
+        category_id: formData.categoryId || assignedCategoryId,
+        subcategory_id: formData.subcategoryId || null,
+        tags: tagsArray,
         variables: variables,
         author: user.id,
-        status: 'pending', // Team members can only create pending prompts
-        image: imageUrl,
+        status: 'pending', // Team members always submit for review
+        featured_image: featuredImage,
+        output_image: formData.outputImage || null,
+        images: formData.images || [],
         seo_title: formData.seoTitle || formData.title,
         seo_description: formData.seoDescription || formData.description,
+        featured: false, // Team members can't mark as featured
+        popular: false,
+        trending: false,
+        content_type: formData.contentType || 'prompt',
+        video_url: formData.videoUrl || null,
         views: 0,
         copies: 0,
         created_at: new Date().toISOString()
@@ -178,7 +350,7 @@ export default function TeamDashboard() {
 
       if (insertError) throw insertError
 
-      setSuccess('Prompt submitted for review!')
+      setSuccess('Prompt submitted for Super Admin review!')
       setShowAddForm(false)
       resetForm()
       await loadData()
@@ -200,8 +372,8 @@ export default function TeamDashboard() {
     setIsLoading(prev => ({ ...prev, submitting: true }))
 
     try {
-      // Generate slug from title
-      const slug = formData.title
+      // Use the slug from form data (auto-generated by handleAutoSlug)
+      const slug = formData.slug || formData.title
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
@@ -211,28 +383,34 @@ export default function TeamDashboard() {
       // Parse variables from prompt
       const variables = extractVariables(formData.prompt)
 
-      // Handle image upload if provided
-      let imageUrl = editingPrompt.image
-      if (formData.image) {
-        try {
-          imageUrl = await uploadImageToGitHub(formData.image)
-        } catch (imageErr) {
-          console.warn('Image upload failed, keeping existing image:', imageErr)
-        }
-      }
+      // Parse tags into array
+      const tagsArray = formData.tags
+        ? formData.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean)
+        : []
 
-      // Update prompt
+      // Handle featured image from images array
+      const featuredImage = formData.images.find(img => img.isFeatured)?.imageUrl || 
+                           formData.images[0]?.imageUrl || 
+                           editingPrompt.featured_image
+
+      // Update prompt with comprehensive data
       const promptData = {
         title: formData.title,
         slug: slug,
         description: formData.description,
         prompt: formData.prompt,
-        tags: formData.tags,
+        category_id: formData.categoryId || assignedCategoryId,
+        subcategory_id: formData.subcategoryId || null,
+        tags: tagsArray,
         variables: variables,
         status: 'pending', // Reset to pending when edited
-        image: imageUrl,
+        featured_image: featuredImage,
+        output_image: formData.outputImage || null,
+        images: formData.images || [],
         seo_title: formData.seoTitle || formData.title,
         seo_description: formData.seoDescription || formData.description,
+        content_type: formData.contentType || 'prompt',
+        video_url: formData.videoUrl || null,
         updated_at: new Date().toISOString()
       }
 
@@ -246,6 +424,7 @@ export default function TeamDashboard() {
 
       setSuccess('Prompt updated and resubmitted for review!')
       setEditingPrompt(null)
+      setShowAddForm(false)
       resetForm()
       await loadData()
 
@@ -260,14 +439,29 @@ export default function TeamDashboard() {
   const resetForm = () => {
     setFormData({
       title: '',
+      slug: '',
+      categoryId: assignedCategoryId || '',
+      subcategoryId: '',
+      tags: '',
       description: '',
       prompt: '',
-      tags: [],
-      tagInput: '',
-      image: null,
+      featuredImage: '',
+      outputImage: '',
+      images: [],
       seoTitle: '',
-      seoDescription: ''
+      seoDescription: '',
+      featured: false,
+      popular: false,
+      trending: false,
+      status: 'pending_review',
+      rejectionReason: '',
+      contentType: 'prompt',
+      videoUrl: '',
     })
+    setImageSourceTab('github')
+    setDriveUrlInput('')
+    setDirectUrlInput('')
+    setUploadError('')
   }
 
   const startEditing = (prompt) => {
@@ -275,34 +469,30 @@ export default function TeamDashboard() {
     
     setFormData({
       title: prompt.title,
+      slug: prompt.slug || '',
+      categoryId: prompt.category_id || assignedCategoryId || '',
+      subcategoryId: prompt.subcategory_id || '',
+      tags: Array.isArray(prompt.tags) ? prompt.tags.join(', ') : (prompt.tags || ''),
       description: prompt.description,
       prompt: prompt.prompt,
-      tags: prompt.tags || [],
-      tagInput: '',
-      image: null, // Don't pre-fill image, user needs to upload new one if changing
+      featuredImage: prompt.featured_image || '',
+      outputImage: prompt.output_image || '',
+      images: prompt.images || [],
       seoTitle: prompt.seo_title || '',
-      seoDescription: prompt.seo_description || ''
+      seoDescription: prompt.seo_description || '',
+      featured: prompt.featured || false,
+      popular: prompt.popular || false,
+      trending: prompt.trending || false,
+      status: prompt.status || 'pending_review',
+      rejectionReason: prompt.rejection_reason || '',
+      contentType: prompt.content_type || 'prompt',
+      videoUrl: prompt.video_url || '',
     })
     setEditingPrompt(prompt)
+    setShowAddForm(true)
   }
 
-  const addTag = () => {
-    const tag = formData.tagInput.trim()
-    if (tag && !formData.tags.includes(tag)) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, tag],
-        tagInput: ''
-      }))
-    }
-  }
 
-  const removeTag = (tagToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }))
-  }
 
   const handleSignOut = async () => {
     try {
@@ -702,145 +892,306 @@ export default function TeamDashboard() {
                     </div>
                   </div>
 
-                  <form onSubmit={editingPrompt ? handleEditPrompt : handleAddPrompt} className="p-6 space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Title */}
-                      <div className="lg:col-span-2">
-                        <label className="block text-ink-muted mb-2 text-sm font-medium">
-                          Prompt Title *
-                        </label>
+                  <form onSubmit={editingPrompt ? handleEditPrompt : handleAddPrompt} className="p-6 space-y-4">
+                    {/* Rejection notice if previously rejected */}
+                    {formData.rejectionReason && (
+                      <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300 flex items-start gap-2">
+                        <AlertTriangle size={16} className="shrink-0 mt-0.5 text-red-400" />
+                        <div>
+                          <p className="font-semibold text-red-200">Rejection Feedback:</p>
+                          <p className="mt-0.5 leading-relaxed">{formData.rejectionReason}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Title & Slug */}
+                    <div className="grid sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="block text-ink-muted mb-1 font-medium text-sm">Prompt Title *</label>
                         <input
                           type="text"
+                          required
                           value={formData.title}
-                          onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                          placeholder="Enter a descriptive title for your prompt..."
-                          required
-                          className="w-full rounded-xl border border-line px-4 py-3 focus:border-violet focus:outline-none bg-white/[0.03] text-ink placeholder:text-ink-faint transition-colors"
+                          onChange={(e) => handleAutoSlug(e.target.value)}
+                          placeholder="e.g. High-Converting Facebook Ad Copy"
+                          className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink focus:border-violet focus:outline-none"
                         />
                       </div>
-
-                      {/* Description */}
-                      <div className="lg:col-span-2">
-                        <label className="block text-ink-muted mb-2 text-sm font-medium">
-                          Description *
-                        </label>
-                        <textarea
-                          value={formData.description}
-                          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                          placeholder="Describe what this prompt does and how it helps users..."
-                          required
-                          rows={3}
-                          className="w-full rounded-xl border border-line px-4 py-3 text-ink placeholder:text-ink-faint focus:border-violet focus:outline-none resize-none bg-white/[0.03] transition-colors"
-                        />
-                      </div>
-
-                      {/* Prompt Content */}
-                      <div className="lg:col-span-2">
-                        <label className="block text-ink-muted mb-2 text-sm font-medium">
-                          Prompt Content *
-                        </label>
-                        <textarea
-                          value={formData.prompt}
-                          onChange={(e) => setFormData(prev => ({ ...prev, prompt: e.target.value }))}
-                          placeholder="Enter your prompt here... Use {{variable_name}} for dynamic variables."
-                          required
-                          rows={8}
-                          className="w-full rounded-xl border border-line px-4 py-3 text-ink placeholder:text-ink-faint focus:border-violet focus:outline-none resize-none bg-white/[0.03] transition-colors font-mono text-sm"
-                        />
-                        <div className="mt-2 p-3 rounded-lg bg-violet/10 border border-violet/20">
-                          <p className="text-xs text-violet-soft font-medium mb-1">Variables Detected:</p>
-                          <p className="text-xs text-ink-muted">
-                            {extractVariables(formData.prompt).length > 0 
-                              ? extractVariables(formData.prompt).join(', ')
-                              : 'No variables found. Use {{variable_name}} syntax to add variables.'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Tags */}
                       <div>
-                        <label className="block text-ink-muted mb-2 text-sm font-medium">
-                          Tags
-                        </label>
-                        <div className="flex gap-2 mb-3">
-                          <input
-                            type="text"
-                            value={formData.tagInput}
-                            onChange={(e) => setFormData(prev => ({ ...prev, tagInput: e.target.value }))}
-                            placeholder="Add a tag..."
-                            className="flex-1 rounded-xl border border-line px-4 py-2 focus:border-violet focus:outline-none bg-white/[0.03] text-ink text-sm placeholder:text-ink-faint transition-colors"
-                            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                          />
-                          <button
-                            type="button"
-                            onClick={addTag}
-                            className="px-4 py-2 rounded-xl border border-line text-ink-muted hover:text-ink hover:bg-white/[0.04] transition-colors text-sm font-medium"
-                          >
-                            Add
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {formData.tags.map(tag => (
-                            <span
-                              key={tag}
-                              className="inline-flex items-center gap-1 bg-violet/20 text-violet-soft px-3 py-1 rounded-full text-xs border border-violet/30"
-                            >
-                              <Tag size={10} />
-                              {tag}
-                              <button
-                                type="button"
-                                onClick={() => removeTag(tag)}
-                                className="hover:text-red-400 ml-1"
-                              >
-                                <X size={10} />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Image Upload */}
-                      <div>
-                        <label className="block text-ink-muted mb-2 text-sm font-medium">
-                          Featured Image (Optional)
-                        </label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => setFormData(prev => ({ ...prev, image: e.target.files[0] }))}
-                          className="w-full rounded-xl border border-line px-4 py-3 focus:border-violet focus:outline-none bg-white/[0.03] text-ink file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:bg-violet/20 file:text-violet-soft hover:file:bg-violet/30 transition-colors"
-                        />
-                      </div>
-
-                      {/* SEO Fields */}
-                      <div>
-                        <label className="block text-ink-muted mb-2 text-sm font-medium">
-                          SEO Title (Optional)
-                        </label>
+                        <label className="block text-ink-muted mb-1 font-medium text-sm">URL Slug *</label>
                         <input
                           type="text"
-                          value={formData.seoTitle}
-                          onChange={(e) => setFormData(prev => ({ ...prev, seoTitle: e.target.value }))}
-                          placeholder="SEO optimized title..."
-                          className="w-full rounded-xl border border-line px-4 py-3 focus:border-violet focus:outline-none bg-white/[0.03] text-ink placeholder:text-ink-faint transition-colors"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-ink-muted mb-2 text-sm font-medium">
-                          SEO Description (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.seoDescription}
-                          onChange={(e) => setFormData(prev => ({ ...prev, seoDescription: e.target.value }))}
-                          placeholder="SEO meta description..."
-                          className="w-full rounded-xl border border-line px-4 py-3 focus:border-violet focus:outline-none bg-white/[0.03] text-ink placeholder:text-ink-faint transition-colors"
+                          required
+                          value={formData.slug}
+                          onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                          placeholder="e.g. high-converting-facebook-ad-copy"
+                          className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink font-mono focus:border-violet focus:outline-none"
                         />
                       </div>
                     </div>
 
-                    {/* Submit Button */}
-                    <div className="flex justify-end gap-3 pt-4 border-t border-line/40">
+                    {/* Tags */}
+                    <div>
+                      <label className="block text-ink-muted mb-1 font-medium text-sm">Tags (comma-separated)</label>
+                      <input
+                        type="text"
+                        value={formData.tags}
+                        onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                        placeholder="marketing, ads, facebook, copywriting"
+                        className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink focus:border-violet focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Category & Subcategory (Team members can see but category is locked) */}
+                    <div className="grid sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="block text-ink-muted mb-1 font-medium text-sm">
+                          Category (Locked to your assigned category)
+                        </label>
+                        <select
+                          disabled={true}
+                          value={formData.categoryId}
+                          className="w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-ink focus:border-violet focus:outline-none opacity-70 cursor-not-allowed"
+                        >
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-ink-muted mb-1 font-medium text-sm">Subcategory (Optional)</label>
+                        <select
+                          value={formData.subcategoryId}
+                          onChange={(e) => setFormData({ ...formData, subcategoryId: e.target.value })}
+                          className="w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2 text-ink focus:border-violet focus:outline-none"
+                        >
+                          <option value="">None / General</option>
+                          {subcategoriesList.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <label className="block text-ink-muted mb-1 font-medium text-sm">Description (Markdown Supported)</label>
+                      <textarea
+                        rows={2}
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        placeholder="A short overview of what this prompt accomplishes..."
+                        className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-ink focus:border-violet focus:outline-none leading-relaxed"
+                      />
+                    </div>
+
+                    {/* Prompt Template */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-ink-muted font-medium text-sm">
+                          Prompt Template * (Use <code className="text-cyan">{'{{variable}}'}</code> for blanks)
+                        </label>
+                        <span className="text-[10px] text-cyan font-mono">
+                          {extractVariables(formData.prompt).length} variables detected
+                        </span>
+                      </div>
+                      <textarea
+                        rows={6}
+                        required
+                        value={formData.prompt}
+                        onChange={(e) => setFormData({ ...formData, prompt: e.target.value })}
+                        placeholder="You are an expert copywriter. Write a Facebook ad for {{BusinessName}} targeting {{Audience}}..."
+                        className="w-full rounded-xl border border-line bg-surface/50 p-3 text-ink font-mono text-xs focus:border-violet focus:outline-none leading-relaxed"
+                      />
+                    </div>
+
+                    {/* MULTI-IMAGE & GOOGLE DRIVE MANAGER */}
+                    <div className="rounded-2xl border border-line bg-surface/40 p-4 space-y-3.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-display font-semibold text-sm text-ink flex items-center gap-2">
+                            <ImageIcon size={15} className="text-cyan" /> Multi-Image Gallery & Media Sources
+                          </h4>
+                          <p className="text-[11px] text-ink-muted mt-0.5">
+                            Add images via GitHub upload, Google Drive share links, or direct URLs.
+                          </p>
+                        </div>
+                        <span className="text-[11px] font-mono text-cyan">
+                          {formData.images.length} attached
+                        </span>
+                      </div>
+
+                      {/* Source Tabs */}
+                      <div className="flex items-center gap-2 border-b border-line/60 pb-2">
+                        <button
+                          type="button"
+                          onClick={() => setImageSourceTab('github')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            imageSourceTab === 'github'
+                              ? 'bg-violet/20 text-violet-soft border border-violet/40'
+                              : 'text-ink-muted hover:text-ink'
+                          }`}
+                        >
+                          GitHub Upload
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setImageSourceTab('drive')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            imageSourceTab === 'drive'
+                              ? 'bg-violet/20 text-violet-soft border border-violet/40'
+                              : 'text-ink-muted hover:text-ink'
+                          }`}
+                        >
+                          Google Drive Link
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setImageSourceTab('url')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            imageSourceTab === 'url'
+                              ? 'bg-violet/20 text-violet-soft border border-violet/40'
+                              : 'text-ink-muted hover:text-ink'
+                          }`}
+                        >
+                          Direct Image URL
+                        </button>
+                      </div>
+
+                      {/* Tab 1: GitHub Upload */}
+                      {imageSourceTab === 'github' && (
+                        <div className="space-y-2">
+                          <label className="flex flex-col items-center justify-center border-2 border-dashed border-line/80 hover:border-violet/50 rounded-xl p-4 cursor-pointer bg-white/[0.01] hover:bg-white/[0.03] transition-all">
+                            <CloudUpload size={22} className="text-violet-soft mb-1" />
+                            <span className="text-xs text-ink font-medium">Click to upload image to GitHub</span>
+                            <span className="text-[10px] text-ink-faint">PNG, JPG, WebP up to 5MB</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={uploadingImage}
+                              onChange={(e) => {
+                                if (e.target.files?.[0]) handleFileUpload(e.target.files[0])
+                              }}
+                              className="hidden"
+                            />
+                          </label>
+                          {uploadingImage && (
+                            <p className="text-[11px] text-violet-soft flex items-center gap-1.5">
+                              <Loader2 size={12} className="animate-spin" /> Uploading to GitHub repo...
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Tab 2: Google Drive Link */}
+                      {imageSourceTab === 'drive' && (
+                        <div className="flex gap-2">
+                          <input
+                            type="url"
+                            value={driveUrlInput}
+                            onChange={(e) => setDriveUrlInput(e.target.value)}
+                            placeholder="Paste Google Drive share link (e.g. https://drive.google.com/file/d/...)"
+                            className="flex-1 rounded-xl border border-line bg-surface/50 px-3 py-2 text-xs text-ink focus:border-violet focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddDriveImage}
+                            className="bg-gradient-to-r from-violet to-violet-soft text-white py-2 px-3 rounded-xl font-medium shadow-glow hover:shadow-lg transition-all duration-200 flex items-center gap-1 text-xs"
+                          >
+                            <Plus size={13} /> Add
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Tab 3: Direct URL */}
+                      {imageSourceTab === 'url' && (
+                        <div className="flex gap-2">
+                          <input
+                            type="url"
+                            value={directUrlInput}
+                            onChange={(e) => setDirectUrlInput(e.target.value)}
+                            placeholder="https://images.unsplash.com/photo-..."
+                            className="flex-1 rounded-xl border border-line bg-surface/50 px-3 py-2 text-xs text-ink focus:border-violet focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddDirectImage}
+                            className="bg-gradient-to-r from-violet to-violet-soft text-white py-2 px-3 rounded-xl font-medium shadow-glow hover:shadow-lg transition-all duration-200 flex items-center gap-1 text-xs"
+                          >
+                            <Plus size={13} /> Add
+                          </button>
+                        </div>
+                      )}
+
+                      {uploadError && (
+                        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 space-y-2">
+                          <div className="flex items-center gap-2 text-red-400 text-xs">
+                            <AlertTriangle size={13} />
+                            <span className="font-medium">Upload Failed</span>
+                          </div>
+                          <div className="text-[11px] text-red-300/90 whitespace-pre-line">
+                            {uploadError}
+                          </div>
+                        </div>
+                      )}
+
+                      {formData.images.length > 0 && (
+                        <div className="space-y-2 pt-2">
+                          <p className="text-[10px] font-mono uppercase text-ink-faint font-semibold">
+                            Attached Images ({formData.images.length})
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                            {formData.images.map((img, idx) => (
+                              <div
+                                key={idx}
+                                className={`relative rounded-xl overflow-hidden border p-1.5 space-y-1 bg-surface-2 transition-all ${
+                                  img.isFeatured ? 'border-violet shadow-glow' : 'border-line'
+                                }`}
+                              >
+                                <img
+                                  src={img.imageUrl}
+                                  alt=""
+                                  className="h-20 w-full object-cover rounded-lg"
+                                />
+                                <div className="flex items-center justify-between text-[10px] pt-1">
+                                  <span className="inline-flex items-center gap-1 bg-violet/20 text-violet-soft px-2 py-0.5 rounded-full text-[9px] uppercase">
+                                    {img.source || 'direct'}
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSetFeaturedImage(idx)}
+                                      className={`p-1 rounded ${
+                                        img.isFeatured ? 'text-amber' : 'text-ink-faint hover:text-ink'
+                                      }`}
+                                      title={img.isFeatured ? 'Featured Cover Image' : 'Set as Featured Cover'}
+                                    >
+                                      <Star size={12} className={img.isFeatured ? 'fill-amber' : ''} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveImage(idx)}
+                                      className="p-1 rounded text-ink-faint hover:text-red-400"
+                                      title="Remove image"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Submit Buttons */}
+                    <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-line">
                       <button
                         type="button"
                         onClick={() => {
@@ -865,7 +1216,7 @@ export default function TeamDashboard() {
                         ) : (
                           <>
                             <Save size={16} />
-                            {editingPrompt ? 'Update Prompt' : 'Submit for Review'}
+                            {editingPrompt ? 'Update & Resubmit for Review' : 'Submit for Review'}
                           </>
                         )}
                       </button>

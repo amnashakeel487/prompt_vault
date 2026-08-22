@@ -1173,8 +1173,9 @@ export default function AdminDashboard() {
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="px-4 py-2 rounded-full border border-line/60 bg-surface/30 text-ink-muted hover:text-ink hover:border-violet/50 transition-all text-xs"
+              className="px-4 py-2 rounded-full border border-line/60 bg-surface/30 text-ink-muted hover:text-ink hover:border-violet/50 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/30 focus-visible:border-violet/50 transition-all text-xs flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
               title="Refresh Data"
+              style={{ outline: 'none' }}
             >
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
               <span className="hidden sm:inline ml-2">Refresh</span>
@@ -1182,7 +1183,7 @@ export default function AdminDashboard() {
             {/* New Prompt Button - Gradient Style */}
             <button
               onClick={openNewPromptModal}
-              className="bg-gradient-to-r from-violet to-violet-soft text-white py-2 px-4 rounded-full font-medium shadow-glow hover:shadow-lg transition-all duration-200 flex items-center gap-2 text-xs"
+              className="bg-gradient-to-r from-violet to-violet-soft text-white py-2 px-4 rounded-full font-medium shadow-glow hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-violet/30 transition-all duration-200 flex items-center gap-2 text-xs"
             >
               <Plus size={14} /> New Prompt
             </button>
