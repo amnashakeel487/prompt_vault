@@ -86,7 +86,7 @@ export default function Navbar() {
                 key={l.to}
                 href={`/#${l.hash}`}
                 onClick={(e) => handleNavClickSimple(e, l)}
-                className="rounded-full px-4 py-2 text-sm transition-colors text-ink-muted hover:text-white hover:bg-white/[0.04]"
+                className="rounded-full px-4 py-2 text-sm transition-colors text-ink-muted hover:text-ink hover:bg-white/[0.05]"
               >
                 {l.label}
               </a>
@@ -108,7 +108,7 @@ export default function Navbar() {
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:text-white hover:bg-white/[0.05] transition-colors"
+              className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-white/[0.05] transition-colors"
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -119,14 +119,14 @@ export default function Navbar() {
               <div className="hidden md:flex items-center gap-2">
                 <Link
                   to="/account"
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-ink-muted hover:text-white hover:bg-white/[0.05] transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-ink-muted hover:text-ink hover:bg-white/[0.05] transition-colors"
                 >
                   <User size={16} />
                   Account
                 </Link>
                 <button
                   onClick={signOut}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-ink-muted hover:text-white hover:bg-white/[0.05] transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-ink-muted hover:text-ink hover:bg-white/[0.05] transition-colors"
                 >
                   <LogOut size={16} />
                   Sign Out
@@ -135,7 +135,7 @@ export default function Navbar() {
             ) : (
               <button
                 onClick={() => setShowAuthModal(true)}
-                className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-violet/20 hover:bg-violet/30 border border-violet/30 transition-colors"
+                className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-violet hover:bg-violet-soft transition-colors shadow-glow"
               >
                 <User size={16} />
                 Sign In
@@ -178,7 +178,7 @@ export default function Navbar() {
               <div className="flex items-center justify-between pt-2 border-t border-line/30">
                 <button
                   onClick={toggleTheme}
-                  className="flex items-center gap-2 py-2.5 text-sm text-ink-muted hover:text-white"
+                  className="flex items-center gap-2 py-2.5 text-sm text-ink-muted hover:text-ink"
                 >
                   {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                   {theme === 'dark' ? 'Light' : 'Dark'} theme
@@ -189,7 +189,7 @@ export default function Navbar() {
                     <Link
                       to="/account"
                       onClick={() => setOpen(false)}
-                      className="flex items-center gap-2 py-2.5 text-sm text-ink-muted hover:text-white"
+                      className="flex items-center gap-2 py-2.5 text-sm text-ink-muted hover:text-ink"
                     >
                       <User size={16} />
                       Account
@@ -199,7 +199,7 @@ export default function Navbar() {
                         signOut()
                         setOpen(false)
                       }}
-                      className="flex items-center gap-2 py-2.5 text-sm text-ink-muted hover:text-white"
+                      className="flex items-center gap-2 py-2.5 text-sm text-ink-muted hover:text-ink"
                     >
                       <LogOut size={16} />
                       Sign Out
@@ -211,7 +211,7 @@ export default function Navbar() {
                       setShowAuthModal(true)
                       setOpen(false)
                     }}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-violet/20 border border-violet/30"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-violet hover:bg-violet-soft"
                   >
                     <User size={16} />
                     Sign In
@@ -225,7 +225,7 @@ export default function Navbar() {
                     key={l.to}
                     href={`/#${l.hash}`}
                     onClick={(e) => handleNavClickSimple(e, l)}
-                    className="flex items-center min-h-[44px] py-2.5 text-sm font-medium text-ink-muted hover:text-white transition-colors"
+                    className="flex items-center min-h-[44px] py-2.5 text-sm font-medium text-ink-muted hover:text-ink transition-colors"
                   >
                     {l.label}
                   </a>

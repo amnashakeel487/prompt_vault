@@ -1094,7 +1094,7 @@ export default function AdminDashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line/60 pb-6">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 style={{ color: '#FFFFFF' }} className="font-display text-2xl sm:text-3xl font-semibold text-white">
+              <h1 className="font-display text-2xl sm:text-3xl font-semibold text-white">
                 {activeTab === 'prompts' && 'Prompts Library'}
                 {activeTab === 'pending' && 'Pending Review Queue'}
                 {activeTab === 'categories' && 'Categories & Tags'}
@@ -1110,7 +1110,7 @@ export default function AdminDashboard() {
                 </span>
               )}
             </div>
-            <p style={{ color: '#C8C4E6' }} className="text-xs sm:text-sm text-ink-muted mt-1">
+            <p className="text-xs sm:text-sm text-ink-muted mt-1">
               {isSuperAdmin
                 ? 'Full system oversight across all categories, permissions, and submissions.'
                 : `Manage prompts and content within your assigned ${assignedCategory?.name || ''} category.`}
@@ -1235,10 +1235,10 @@ export default function AdminDashboard() {
             ) : filteredPrompts.length === 0 ? (
               <div className="glass-card p-12 text-center space-y-3">
                 <FileText size={32} className="text-ink-faint mx-auto" />
-                <p style={{ color: '#FFFFFF' }} className="font-display text-sm font-semibold text-white">
+                <p className="font-display text-sm font-semibold text-white">
                   No prompts found
                 </p>
-                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted max-w-sm mx-auto">
+                <p className="text-xs text-ink-muted max-w-sm mx-auto">
                   {searchQuery || statusFilter !== 'all' || categoryFilter !== 'all'
                     ? 'Try adjusting your filters or search query.'
                     : 'Create your first prompt to populate the library.'}
@@ -1368,10 +1368,10 @@ export default function AdminDashboard() {
                   <CheckSquare size={20} />
                 </span>
                 <div>
-                  <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-sm sm:text-base text-white">
+                  <h3 className="font-display font-semibold text-sm sm:text-base text-white">
                     Approval Workflow Queue
                   </h3>
-                  <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                  <p className="text-xs text-ink-muted">
                     Prompts submitted by Category Admins that require Super Admin approval before going live.
                   </p>
                 </div>
@@ -1384,10 +1384,10 @@ export default function AdminDashboard() {
             {pendingList.length === 0 ? (
               <div className="glass-card p-12 text-center space-y-2">
                 <CheckCircle2 size={32} className="text-cyan mx-auto" />
-                <p style={{ color: '#FFFFFF' }} className="font-display text-sm font-semibold text-white">
+                <p className="font-display text-sm font-semibold text-white">
                   Inbox zero!
                 </p>
-                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                <p className="text-xs text-ink-muted">
                   All category admin submissions have been reviewed and approved.
                 </p>
               </div>
@@ -1408,10 +1408,10 @@ export default function AdminDashboard() {
                             Submitted by {p.author || 'Admin'} · {p.createdAt || 'Recently'}
                           </span>
                         </div>
-                        <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-base sm:text-lg text-white">
+                        <h3 className="font-display font-semibold text-base sm:text-lg text-white">
                           {p.title}
                         </h3>
-                        <p style={{ color: '#C8C4E6' }} className="text-xs sm:text-sm text-ink-muted mt-1 leading-relaxed">
+                        <p className="text-xs sm:text-sm text-ink-muted mt-1 leading-relaxed">
                           {p.description}
                         </p>
                       </div>
@@ -1462,10 +1462,10 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-lg text-white">
+                <h2 className="font-display font-semibold text-lg text-white">
                   Categories ({categoriesList.length})
                 </h2>
-                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                <p className="text-xs text-ink-muted">
                   Create and organize top-level prompt families.
                 </p>
               </div>
@@ -1482,7 +1482,7 @@ export default function AdminDashboard() {
                       <Sparkles size={18} />
                     </span>
                     <div>
-                      <h4 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-sm text-white">
+                      <h4 className="font-display font-semibold text-sm text-white">
                         {cat.name}
                       </h4>
                       <p className="text-[11px] text-ink-faint">{cat.count || 0} published prompts</p>
@@ -1515,10 +1515,10 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-lg text-white">
+                <h2 className="font-display font-semibold text-lg text-white">
                   Admin Team & Category Permissions ({adminsList.length})
                 </h2>
-                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                <p className="text-xs text-ink-muted">
                   Create admin accounts, assign roles, and scope category access.
                 </p>
               </div>
@@ -1611,10 +1611,10 @@ export default function AdminDashboard() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-lg text-white">
+                <h2 className="font-display font-semibold text-lg text-white">
                   Team Member Requests ({teamRequestsList.length})
                 </h2>
-                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                <p className="text-xs text-ink-muted">
                   Review and approve requests from users who want to become team members.
                 </p>
               </div>
@@ -1623,10 +1623,10 @@ export default function AdminDashboard() {
             {teamRequestsList.length === 0 ? (
               <div className="glass-card p-12 text-center space-y-2">
                 <UserPlus size={32} className="text-ink-faint mx-auto" />
-                <p style={{ color: '#FFFFFF' }} className="font-display text-sm font-semibold text-white">
+                <p className="font-display text-sm font-semibold text-white">
                   No pending requests
                 </p>
-                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                <p className="text-xs text-ink-muted">
                   When users submit team member requests, they'll appear here for review.
                 </p>
               </div>
@@ -1708,10 +1708,10 @@ export default function AdminDashboard() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-lg text-white">
+                <h2 className="font-display font-semibold text-lg text-white">
                   Messages Inbox ({messagesList.length})
                 </h2>
-                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                <p className="text-xs text-ink-muted">
                   Direct inquiries from the public contact page.
                 </p>
               </div>
@@ -1720,10 +1720,10 @@ export default function AdminDashboard() {
             {messagesList.length === 0 ? (
               <div className="glass-card p-12 text-center space-y-2">
                 <Inbox size={32} className="text-ink-faint mx-auto" />
-                <p style={{ color: '#FFFFFF' }} className="font-display text-sm font-semibold text-white">
+                <p className="font-display text-sm font-semibold text-white">
                   No messages yet
                 </p>
-                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+                <p className="text-xs text-ink-muted">
                   When visitors submit the contact form, their notes will appear here.
                 </p>
               </div>
@@ -1780,10 +1780,10 @@ export default function AdminDashboard() {
         {activeTab === 'analytics' && (
           <div className="space-y-6">
             <div className="glass-card p-5 sm:p-6 space-y-4">
-              <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-base sm:text-lg text-white">
+              <h3 className="font-display font-semibold text-base sm:text-lg text-white">
                 Content Engagement Overview
               </h3>
-              <p style={{ color: '#C8C4E6' }} className="text-xs sm:text-sm text-ink-muted">
+              <p className="text-xs sm:text-sm text-ink-muted">
                 Tracking runs, copies, and views across published prompts.
               </p>
 
@@ -1811,10 +1811,10 @@ export default function AdminDashboard() {
         {activeTab === 'profile' && (
           <div className="max-w-xl space-y-6">
             <div className="glass-card p-5 sm:p-6 space-y-4">
-              <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-base sm:text-lg text-white">
+              <h3 className="font-display font-semibold text-base sm:text-lg text-white">
                 Security & Password
               </h3>
-              <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted">
+              <p className="text-xs text-ink-muted">
                 Update your login credentials.
               </p>
 
@@ -1864,10 +1864,10 @@ export default function AdminDashboard() {
           <div className="glass-card w-full max-w-3xl my-8 p-5 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-line pb-4">
               <div>
-                <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-lg text-white">
+                <h3 className="font-display font-semibold text-lg text-white">
                   {editingPromptId ? 'Edit Prompt' : 'Create New Prompt'}
                 </h3>
-                <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted mt-0.5">
+                <p className="text-xs text-ink-muted mt-0.5">
                   {isCategoryAdmin
                     ? 'Submitting will place this prompt into the Super Admin approval queue.'
                     : 'Configure variables, categories, images, and publish status.'}
@@ -2008,10 +2008,10 @@ export default function AdminDashboard() {
               <div className="rounded-2xl border border-line bg-surface/40 p-4 space-y-3.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-sm text-white flex items-center gap-2">
+                    <h4 className="font-display font-semibold text-sm text-white flex items-center gap-2">
                       <ImageIcon size={15} className="text-cyan" /> Multi-Image Gallery & Media Sources
                     </h4>
-                    <p style={{ color: '#C8C4E6' }} className="text-[11px] text-ink-muted mt-0.5">
+                    <p className="text-[11px] text-ink-muted mt-0.5">
                       Add images via GitHub upload, Google Drive share links, or direct URLs.
                     </p>
                   </div>
@@ -2258,7 +2258,7 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="glass-card w-full max-w-md p-6 space-y-4 border-red-500/30">
             <div className="flex items-center justify-between border-b border-line pb-3">
-              <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-base text-white flex items-center gap-2">
+              <h3 className="font-display font-semibold text-base text-white flex items-center gap-2">
                 <XCircle size={18} className="text-red-400" /> Reject Prompt Submission
               </h3>
               <button
@@ -2269,7 +2269,7 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <p style={{ color: '#C8C4E6' }} className="text-xs text-ink-muted leading-relaxed">
+            <p className="text-xs text-ink-muted leading-relaxed">
               Rejecting <strong className="text-white">"{rejectModal.promptTitle}"</strong>. Provide optional feedback so the Category Admin can correct and resubmit.
             </p>
 
@@ -2313,7 +2313,7 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="glass-card w-full max-w-md p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-line pb-3">
-              <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-base text-white flex items-center gap-2">
+              <h3 className="font-display font-semibold text-base text-white flex items-center gap-2">
                 <Users size={18} className="text-cyan" /> Invite / Create Admin User
               </h3>
               <button
@@ -2422,7 +2422,7 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="glass-card w-full max-w-md p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-line pb-3">
-              <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-base text-white">
+              <h3 className="font-display font-semibold text-base text-white">
                 {editingCatId ? 'Edit Category' : 'New Category'}
               </h3>
               <button

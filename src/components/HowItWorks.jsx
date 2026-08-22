@@ -29,10 +29,10 @@ export default function HowItWorks() {
   return (
     <section className="section-pad py-12 sm:py-16">
       <div className="mb-8 sm:mb-10 text-center md:text-left">
-        <h2 style={{ color: '#FFFFFF' }} className="font-display text-xl sm:text-2xl md:text-3xl font-semibold text-white">
+        <h2 className="font-display text-xl sm:text-2xl md:text-3xl font-semibold text-ink">
           How it works
         </h2>
-        <p style={{ color: '#C8C4E6' }} className="mt-1 sm:mt-1.5 text-xs sm:text-sm text-ink-muted">
+        <p className="mt-1 sm:mt-1.5 text-xs sm:text-sm text-ink-muted">
           From idea to finished prompt in under a minute.
         </p>
       </div>
@@ -54,15 +54,15 @@ export default function HowItWorks() {
                   <span className="grid h-10 w-10 sm:h-11 sm:w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet/20 to-cyan/10 border border-line text-violet-soft">
                     <Icon size={18} className="sm:w-5 sm:h-5" />
                   </span>
-                  <span style={{ color: '#A09ABF' }} className="font-mono text-xs font-semibold text-ink-faint">
+                  <span className="font-mono text-xs font-semibold text-ink-faint">
                     {s.step}
                   </span>
                 </div>
 
-                <h3 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-white text-base sm:text-lg">
+                <h3 className="font-display font-semibold text-ink text-base sm:text-lg">
                   {s.title}
                 </h3>
-                <p style={{ color: '#C8C4E6' }} className="mt-2 text-xs sm:text-sm text-ink-muted leading-relaxed">
+                <p className="mt-2 text-xs sm:text-sm text-ink-muted leading-relaxed">
                   {s.description}
                 </p>
               </div>

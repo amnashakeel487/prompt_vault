@@ -52,16 +52,10 @@ export default function CategoryCard({ category, index = 0 }) {
           <Icon size={18} className="sm:w-5 sm:h-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <h3
-            style={{ color: '#FFFFFF' }}
-            className="font-display font-semibold text-sm sm:text-base text-white truncate group-hover:!text-violet-soft transition-colors"
-          >
+          <h3 className="font-display font-semibold text-sm sm:text-base text-ink truncate group-hover:!text-violet-soft transition-colors">
             {category.name}
           </h3>
-          <p
-            style={{ color: '#C8C4E6' }}
-            className="text-[11px] sm:text-xs text-ink-muted"
-          >
+          <p className="text-[11px] sm:text-xs text-ink-muted">
             {category.count ?? 0} prompts
           </p>
         </div>

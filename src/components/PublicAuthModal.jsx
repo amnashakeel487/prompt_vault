@@ -57,14 +57,14 @@ export default function PublicAuthModal({ isOpen, onClose, defaultMode = 'signin
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <div className="glass-card w-full max-w-md p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-xl font-semibold text-white">
+          <h2 className="font-display text-xl font-semibold text-ink">
             {mode === 'signin' && 'Sign In'}
             {mode === 'signup' && 'Create Account'}
             {mode === 'reset' && 'Reset Password'}
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-ink-muted hover:text-white transition-colors"
+            className="p-1 text-ink-muted hover:text-ink transition-colors"
           >
             <X size={20} />
           </button>
@@ -94,7 +94,7 @@ export default function PublicAuthModal({ isOpen, onClose, defaultMode = 'signin
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
-                className="w-full rounded-xl border border-line bg-surface/50 pl-11 pr-4 py-3 text-white placeholder:text-ink-faint focus:border-violet focus:outline-none"
+                className="w-full rounded-xl border border-line bg-surface/50 pl-11 pr-4 py-3 text-ink placeholder:text-ink-faint focus:border-violet focus:outline-none"
               />
             </div>
           </div>
@@ -110,7 +110,7 @@ export default function PublicAuthModal({ isOpen, onClose, defaultMode = 'signin
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-xl border border-line bg-surface/50 pl-11 pr-4 py-3 text-white placeholder:text-ink-faint focus:border-violet focus:outline-none"
+                  className="w-full rounded-xl border border-line bg-surface/50 pl-11 pr-4 py-3 text-ink placeholder:text-ink-faint focus:border-violet focus:outline-none"
                 />
               </div>
             </div>
@@ -127,7 +127,7 @@ export default function PublicAuthModal({ isOpen, onClose, defaultMode = 'signin
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-xl border border-line bg-surface/50 pl-11 pr-4 py-3 text-white placeholder:text-ink-faint focus:border-violet focus:outline-none"
+                  className="w-full rounded-xl border border-line bg-surface/50 pl-11 pr-4 py-3 text-ink placeholder:text-ink-faint focus:border-violet focus:outline-none"
                 />
               </div>
             </div>
@@ -163,7 +163,7 @@ export default function PublicAuthModal({ isOpen, onClose, defaultMode = 'signin
                 Don't have an account?{' '}
                 <button
                   onClick={() => handleModeSwitch('signup')}
-                  className="text-violet-soft hover:text-white transition-colors"
+                  className="text-violet-soft hover:text-ink transition-colors font-medium"
                 >
                   Sign up
                 </button>
@@ -176,7 +176,7 @@ export default function PublicAuthModal({ isOpen, onClose, defaultMode = 'signin
               Already have an account?{' '}
               <button
                 onClick={() => handleModeSwitch('signin')}
-                className="text-violet-soft hover:text-white transition-colors"
+                className="text-violet-soft hover:text-ink transition-colors font-medium"
               >
                 Sign in
               </button>
@@ -188,7 +188,7 @@ export default function PublicAuthModal({ isOpen, onClose, defaultMode = 'signin
               Remember your password?{' '}
               <button
                 onClick={() => handleModeSwitch('signin')}
-                className="text-violet-soft hover:text-white transition-colors"
+                className="text-violet-soft hover:text-ink transition-colors font-medium"
               >
                 Sign in
               </button>

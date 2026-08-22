@@ -168,10 +168,7 @@ export default function PromptDetails() {
               )}
             </div>
 
-            <h1
-              style={{ color: '#FFFFFF' }}
-              className="font-display text-2xl sm:text-3xl md:text-4xl font-semibold text-white leading-tight break-words"
-            >
+            <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-semibold text-ink leading-tight break-words">
               {prompt.title}
             </h1>
 
@@ -223,7 +220,7 @@ export default function PromptDetails() {
                       className={`relative h-16 w-24 shrink-0 rounded-lg overflow-hidden border transition-all cursor-pointer ${
                         activeImageIndex === idx
                           ? 'border-violet shadow-glow scale-[1.03]'
-                          : 'border-line/60 opacity-60 hover:opacity-100 hover:border-white/40'
+                          : 'border-line/60 opacity-60 hover:opacity-100 hover:border-violet-soft'
                       }`}
                     >
                       <img
@@ -243,7 +240,7 @@ export default function PromptDetails() {
             </div>
           )}
 
-          <div className="mt-5 sm:mt-6 prose prose-invert max-w-none text-xs sm:text-sm prose-p:text-ink-muted prose-headings:font-display">
+          <div className="mt-5 sm:mt-6 prose prose-invert max-w-none text-xs sm:text-sm prose-p:text-ink-muted prose-headings:font-display prose-headings:text-ink">
             <ReactMarkdown>{prompt.description}</ReactMarkdown>
           </div>
 
@@ -252,11 +249,11 @@ export default function PromptDetails() {
           </div>
 
           <div className="mt-6">
-            <h3 style={{ color: '#FFFFFF' }} className="mb-3 font-display font-semibold text-white text-base sm:text-lg">
+            <h3 className="mb-3 font-display font-semibold text-ink text-base sm:text-lg">
               Generated prompt
             </h3>
             <div className="glass-card p-4 sm:p-5">
-              <div className="font-mono text-xs sm:text-sm leading-relaxed whitespace-pre-wrap text-ink/90 break-words overflow-x-hidden">
+              <div className="font-mono text-xs sm:text-sm leading-relaxed whitespace-pre-wrap text-ink break-words overflow-x-hidden">
                 {tokens.map((tok, i) =>
                   tok.type === 'text' ? (
                     <span key={i}>{tok.value}</span>
@@ -283,7 +280,7 @@ export default function PromptDetails() {
         {/* Sidebar */}
         <aside className="space-y-6">
           <div className="glass-card p-4 sm:p-5">
-            <h4 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-white mb-3 text-sm sm:text-base">
+            <h4 className="font-display font-semibold text-ink mb-3 text-sm sm:text-base">
               At a glance
             </h4>
             <dl className="space-y-2.5 text-xs sm:text-sm">
@@ -314,7 +311,7 @@ export default function PromptDetails() {
 
           {related && related.length > 0 && (
             <div>
-              <h4 style={{ color: '#FFFFFF' }} className="font-display font-semibold text-white mb-3 text-sm sm:text-base">
+              <h4 className="font-display font-semibold text-ink mb-3 text-sm sm:text-base">
                 Related prompts
               </h4>
               <div className="grid gap-3.5 sm:gap-4 sm:grid-cols-2 lg:grid-cols-1">

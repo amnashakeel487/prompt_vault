@@ -25,7 +25,7 @@ export default function TrustedBy() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: i * 0.08 }}
-              className="font-display text-xs sm:text-sm font-semibold tracking-tight text-ink-muted hover:text-white transition-colors select-none"
+              className="font-display text-xs sm:text-sm font-semibold tracking-tight text-ink-muted hover:text-ink transition-colors select-none"
             >
               {name}
             </motion.span>

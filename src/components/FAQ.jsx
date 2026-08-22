@@ -55,14 +55,10 @@ export default function FAQ() {
             >
               <button
                 onClick={() => toggle(i)}
-                className="flex w-full items-center justify-between p-4 sm:p-5 text-left transition-colors hover:bg-white/[0.02] min-h-[48px]"
+                className="flex w-full items-center justify-between p-4 sm:p-5 text-left transition-colors hover:bg-white/[0.02] min-h-[48px] text-ink"
                 aria-expanded={isOpen}
-                style={{ color: '#F4F2FF' }}
               >
-                <span
-                  className="font-display font-semibold text-xs sm:text-sm md:text-base pr-3 sm:pr-4 leading-snug"
-                  style={{ color: '#F4F2FF' }}
-                >
+                <span className="font-display font-semibold text-xs sm:text-sm md:text-base pr-3 sm:pr-4 leading-snug text-ink">
                   {item.q}
                 </span>
                 <motion.span

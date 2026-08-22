@@ -63,16 +63,10 @@ export default function PromptCard({ prompt, index = 0, onAuthRequired }) {
               )}
             </div>
             <div className="p-3.5 sm:p-4">
-              <h3
-                style={{ color: '#FFFFFF' }}
-                className="font-display text-sm sm:text-base font-semibold text-white line-clamp-1 group-hover:!text-violet-soft transition-colors"
-              >
+              <h3 className="font-display text-sm sm:text-base font-semibold text-ink line-clamp-1 group-hover:!text-violet-soft transition-colors">
                 {prompt.title}
               </h3>
-              <p
-                style={{ color: '#C8C4E6' }}
-                className="mt-1.5 text-xs sm:text-sm text-ink-muted line-clamp-2 leading-relaxed"
-              >
+              <p className="mt-1.5 text-xs sm:text-sm text-ink-muted line-clamp-2 leading-relaxed">
                 {prompt.description}
               </p>
               {tags.length > 0 && (

@@ -33,7 +33,7 @@ export default class ErrorBoundary extends React.Component {
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold text-white font-display">Something went wrong</h2>
+              <h2 className="text-lg font-semibold text-ink font-display">Something went wrong</h2>
               <p className="text-xs text-ink-muted mt-1 leading-relaxed">
                 An unexpected error occurred while rendering this page.
               </p>

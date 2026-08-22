@@ -99,7 +99,7 @@ export default function SearchResults() {
                 className={`px-3 py-1.5 text-xs rounded-full transition-all ${
                   sortBy === value
                     ? 'bg-violet/20 text-violet-soft border border-violet/30'
-                    : 'bg-white/[0.03] text-ink-muted border border-line hover:bg-white/[0.06] hover:text-white'
+                    : 'bg-white/[0.03] text-ink-muted border border-line hover:bg-white/[0.06] hover:text-ink'
                 }`}
               >
                 {label}

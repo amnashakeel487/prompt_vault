@@ -54,10 +54,7 @@ export default function Home() {
               <span className="bg-gradient-to-r from-violet-soft to-cyan bg-clip-text text-transparent">fill-in-the-blank</span>{' '}
               shortcut.
             </h1>
-            <p
-              style={{ color: '#FFFFFF' }}
-              className="mt-4 sm:mt-5 max-w-lg text-sm sm:text-base !text-white leading-relaxed font-normal"
-            >
+            <p className="mt-4 sm:mt-5 max-w-lg text-sm sm:text-base text-ink-muted leading-relaxed font-normal">
               Browse a library of production-tested AI prompts. Swap in your business, audience, and tone —
               PromptVault detects the variables and builds the form for you.
             </p>
@@ -72,15 +69,15 @@ export default function Home() {
             <div className="mt-8 sm:mt-10 grid grid-cols-3 gap-2 sm:gap-6 pt-4 border-t border-line/40 sm:border-0 sm:pt-0">
               <div>
                 <p className="font-display text-xl sm:text-2xl font-semibold text-ink">{totalPromptCount}</p>
-                <p className="text-xs sm:text-sm text-white/70">Prompts</p>
+                <p className="text-xs sm:text-sm text-ink-muted">Prompts</p>
               </div>
               <div>
                 <p className="font-display text-xl sm:text-2xl font-semibold text-ink">{totalCategoriesCount}</p>
-                <p className="text-xs sm:text-sm text-white/70">Categories</p>
+                <p className="text-xs sm:text-sm text-ink-muted">Categories</p>
               </div>
               <div>
                 <p className="font-display text-xl sm:text-2xl font-semibold text-ink">40k+</p>
-                <p className="text-xs sm:text-sm text-white/70">Copies</p>
+                <p className="text-xs sm:text-sm text-ink-muted">Copies</p>
               </div>
             </div>
           </motion.div>
@@ -104,7 +101,7 @@ export default function Home() {
             <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">Browse by category</h2>
             <p className="mt-1 text-xs sm:text-sm text-ink-muted">Find the right prompt family for the job.</p>
           </div>
-          <Link to="/categories" className="hidden sm:flex items-center gap-1 text-sm text-violet-soft hover:text-white">
+          <Link to="/categories" className="hidden sm:flex items-center gap-1 text-sm text-violet-soft hover:text-violet transition-colors">
             View all <ArrowRight size={14} />
           </Link>
         </div>
@@ -156,7 +153,7 @@ export default function Home() {
             </h2>
             <p className="mt-1 text-xs sm:text-sm text-ink-muted">Community favorites with the most hearts.</p>
           </div>
-          <Link to="/search?sort=favorites" className="hidden sm:flex items-center gap-1 text-sm text-violet-soft hover:text-white">
+          <Link to="/search?sort=favorites" className="hidden sm:flex items-center gap-1 text-sm text-violet-soft hover:text-violet transition-colors">
             View all <ArrowRight size={14} />
           </Link>
         </div>
@@ -178,7 +175,7 @@ export default function Home() {
             <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">Latest prompts</h2>
             <p className="mt-1 text-xs sm:text-sm text-ink-muted">Fresh additions to the library.</p>
           </div>
-          <Link to="/latest" className="hidden sm:flex items-center gap-1 text-sm text-violet-soft hover:text-white">
+          <Link to="/latest" className="hidden sm:flex items-center gap-1 text-sm text-violet-soft hover:text-violet transition-colors">
             View all <ArrowRight size={14} />
           </Link>
         </div>

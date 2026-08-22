@@ -222,6 +222,26 @@
   .bg-grid-glow {
     background-image: var(--bg-grid-glow);
   }
+
+  /* Light theme prose compatibility */
+  [data-theme="light"] .prose-invert {
+    --tw-prose-body: var(--color-ink-muted);
+    --tw-prose-headings: var(--color-ink);
+    --tw-prose-lead: var(--color-ink-muted);
+    --tw-prose-links: var(--color-violet);
+    --tw-prose-bold: var(--color-ink);
+    --tw-prose-counters: var(--color-ink-faint);
+    --tw-prose-bullets: var(--color-ink-faint);
+    --tw-prose-hr: var(--color-line);
+    --tw-prose-quotes: var(--color-ink);
+    --tw-prose-quote-borders: var(--color-violet);
+    --tw-prose-captions: var(--color-ink-faint);
+    --tw-prose-code: var(--color-ink);
+    --tw-prose-pre-code: var(--color-ink);
+    --tw-prose-pre-bg: var(--color-surface-2);
+    --tw-prose-th-borders: var(--color-line);
+    --tw-prose-td-borders: var(--color-line);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

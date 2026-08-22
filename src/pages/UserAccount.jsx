@@ -86,7 +86,7 @@ export default function UserAccount() {
     return (
       <section className="section-pad py-20">
         <div className="text-center">
-          <h1 className="font-display text-2xl font-semibold text-white mb-4">
+          <h1 className="font-display text-2xl font-semibold text-ink mb-4">
             Please sign in to access your account
           </h1>
           <Link to="/" className="btn-primary">
@@ -113,7 +113,7 @@ export default function UserAccount() {
                 <User size={24} />
               </div>
               <div>
-                <h1 className="font-display text-2xl font-semibold text-white">My Account</h1>
+                <h1 className="font-display text-2xl font-semibold text-ink">My Account</h1>
                 <div className="flex items-center gap-2 mt-1">
                   <Mail size={16} className="text-ink-muted" />
                   <span className="text-ink-muted">{user.email}</span>
@@ -132,7 +132,7 @@ export default function UserAccount() {
 
           {/* Team Member Status/Request */}
           <div className="border-t border-line pt-6">
-            <h3 className="font-display font-semibold text-white mb-4 flex items-center gap-2">
+            <h3 className="font-display font-semibold text-ink mb-4 flex items-center gap-2">
               <Users size={20} />
               Team Member Status
             </h3>
@@ -167,7 +167,7 @@ export default function UserAccount() {
                 {teamRequest.status === 'approved' && (
                   <Link 
                     to="/admin/dashboard" 
-                    className="inline-block mt-2 text-cyan hover:text-white transition-colors text-sm"
+                    className="inline-block mt-2 text-cyan hover:text-ink transition-colors text-sm"
                   >
                     Go to Admin Dashboard →
                   </Link>
@@ -253,7 +253,7 @@ export default function UserAccount() {
         <div>
           <div className="flex items-center gap-3 mb-6">
             <Heart size={24} className="text-red-400" />
-            <h2 className="font-display text-xl font-semibold text-white">
+            <h2 className="font-display text-xl font-semibold text-ink">
               My Favorites ({favorites.length})
             </h2>
           </div>
@@ -271,7 +271,7 @@ export default function UserAccount() {
           ) : favorites.length === 0 ? (
             <div className="glass-card p-12 text-center">
               <Heart size={48} className="text-ink-faint mx-auto mb-4" />
-              <h3 className="font-display text-lg font-semibold text-white mb-2">
+              <h3 className="font-display text-lg font-semibold text-ink mb-2">
                 No favorites yet
               </h3>
               <p className="text-ink-muted mb-6">

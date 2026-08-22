@@ -116,7 +116,7 @@ export default function CategoryDetail() {
             className={`chip transition-colors cursor-pointer text-xs py-1.5 px-3.5 ${
               activeSub === 'all'
                 ? '!border-violet/40 !bg-violet/15 !text-violet-soft'
-                : 'hover:text-white'
+                : 'hover:text-ink'
             }`}
           >
             All
@@ -128,7 +128,7 @@ export default function CategoryDetail() {
               className={`chip transition-colors cursor-pointer text-xs py-1.5 px-3.5 ${
                 activeSub === s.id
                   ? '!border-violet/40 !bg-violet/15 !text-violet-soft'
-                  : 'hover:text-white'
+                  : 'hover:text-ink'
               }`}
             >
               {s.name}
