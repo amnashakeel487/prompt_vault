@@ -1680,7 +1680,7 @@ export default function AdminDashboard() {
                           </div>
                           <div>
                             <p className="font-medium text-ink text-sm">
-                              {request.users?.email || 'Unknown User'}
+                              {request.user_email || request.users?.email || 'Applicant User'}
                             </p>
                             <p className="text-xs text-ink-faint">
                               {new Date(request.created_at).toLocaleDateString()}
@@ -1688,11 +1688,11 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                         
-                        {request.categories && (
+                        {(request.category_name || request.categories?.name) && (
                           <div className="mb-2">
                             <span className="text-xs text-ink-muted">Requested Category: </span>
                             <span className="chip !text-xs !py-1">
-                              {request.categories.name}
+                              {request.category_name || request.categories?.name}
                             </span>
                           </div>
                         )}
@@ -1711,7 +1711,7 @@ export default function AdminDashboard() {
                         <button
                           onClick={() => handleApproveTeamRequest(
                             request.id, 
-                            request.users?.email,
+                            request.user_email || request.users?.email,
                             request.requested_category_id
                           )}
                           className="btn-primary !py-2 !px-3 !text-xs"
@@ -1722,7 +1722,7 @@ export default function AdminDashboard() {
                         <button
                           onClick={() => handleRejectTeamRequest(
                             request.id, 
-                            request.users?.email,
+                            request.user_email || request.users?.email,
                             'Request rejected by admin'
                           )}
                           className="btn-ghost !py-2 !px-3 !text-xs !text-red-400 !border-red-500/30 hover:!bg-red-500/10"

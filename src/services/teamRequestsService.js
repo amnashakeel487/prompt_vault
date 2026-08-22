@@ -28,18 +28,34 @@ export async function submitTeamMemberRequest({ requestedCategoryId, message }) 
     throw new Error('You already have a pending request')
   }
 
+  const payload = {
+    user_id: user.id,
+    user_email: user.email || '',
+    requested_category_id: requestedCategoryId || null,
+    message: message || '',
+    status: 'pending'
+  }
+
   const { data, error } = await supabase
     .from('team_member_requests')
-    .insert([{
-      user_id: user.id,
-      requested_category_id: requestedCategoryId,
-      message: message || '',
-      status: 'pending'
-    }])
+    .insert([payload])
     .select()
     .maybeSingle()
 
   if (error) {
+    // Retry without user_email column in case schema hasn't added user_email column yet
+    if (error.message?.includes('user_email')) {
+      delete payload.user_email
+      const { data: retryData, error: retryErr } = await supabase
+        .from('team_member_requests')
+        .insert([payload])
+        .select()
+        .maybeSingle()
+
+      if (retryErr) throw retryErr
+      return retryData
+    }
+
     if (error.code === '42P01' || error.message?.includes('schema cache')) {
       throw new Error('Database table "team_member_requests" is not created in Supabase yet. Please run the SQL script provided in your Supabase SQL Editor.')
     }
@@ -55,10 +71,7 @@ export async function getTeamMemberRequests({ status = null } = {}) {
   try {
     let query = supabase
       .from('team_member_requests')
-      .select(`
-        *,
-        categories(name)
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (status) {
@@ -71,7 +84,19 @@ export async function getTeamMemberRequests({ status = null } = {}) {
       console.warn('Error loading team member requests:', error)
       return []
     }
-    return data || []
+
+    if (!data || data.length === 0) return []
+
+    // Fetch category names safely
+    const { data: categories } = await supabase.from('categories').select('id, name')
+    const categoryMap = {}
+    categories?.forEach(c => { categoryMap[c.id] = c.name })
+
+    return data.map(req => ({
+      ...req,
+      category_name: categoryMap[req.requested_category_id] || 'General',
+      user_email: req.user_email || req.email || 'Applicant'
+    }))
   } catch (err) {
     console.warn('Failed to load team member requests:', err)
     return []
