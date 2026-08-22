@@ -41,6 +41,13 @@ export function usePrompts(options = {}) {
         limit,
       })
 
+      if (res.error) {
+        console.error('usePrompts: getPrompts returned error:', res.error)
+        setError(res.error)
+        setLoading(false)
+        return
+      }
+
       setTotal(res.total)
       setTotalPages(res.totalPages)
       setPage(targetPage)
