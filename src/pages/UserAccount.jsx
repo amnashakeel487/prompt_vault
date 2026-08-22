@@ -11,7 +11,7 @@ import { getCategories } from '../services/promptService'
 import { formatPrompt } from '../services/promptService'
 
 export default function UserAccount() {
-  const { user, signOut, isCategoryAdmin } = usePublicAuth()
+  const { user, signOut, isCategoryAdmin, refreshProfile } = usePublicAuth()
   const { isSuperAdmin } = useAuth()
   const navigate = useNavigate()
   const [favorites, setFavorites] = useState([])
@@ -30,12 +30,12 @@ export default function UserAccount() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  // Redirect approved team members to their dashboard
-  useEffect(() => {
-    if (isCategoryAdmin && user) {
-      navigate('/team/dashboard', { replace: true })
-    }
-  }, [isCategoryAdmin, user, navigate])
+  // Don't automatically redirect approved team members - let them choose when to go to dashboard
+  // useEffect(() => {
+  //   if (isCategoryAdmin && user) {
+  //     navigate('/team/dashboard', { replace: true })
+  //   }
+  // }, [isCategoryAdmin, user, navigate])
 
   useEffect(() => {
     loadData()
@@ -54,6 +54,11 @@ export default function UserAccount() {
       setFavorites(favoritesData.map(formatPrompt))
       setCategories(categoriesData)
       setTeamRequest(requestData)
+
+      // Refresh the PublicAuth profile to check if user became a category admin
+      if (refreshProfile) {
+        await refreshProfile()
+      }
     } catch (err) {
       console.error('Error loading user data:', err)
     } finally {
@@ -165,39 +170,48 @@ export default function UserAccount() {
                   Go to Admin Dashboard →
                 </Link>
               </div>
+            ) : isCategoryAdmin || (teamRequest && teamRequest.status === 'approved') ? (
+              <div className="p-4 rounded-xl border border-green-500/30 bg-green-500/10">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 size={18} className="text-green-400" />
+                  <span className="font-medium text-green-400">🎉 Congratulations! You're Now a Team Member</span>
+                </div>
+                <p className="text-sm text-ink-muted mb-4">
+                  Your team member request has been approved! You now have access to the contributor dashboard where you can:
+                </p>
+                <ul className="text-xs text-ink-muted mb-4 space-y-1 pl-4">
+                  <li>• Create and submit new prompts for review</li>
+                  <li>• Manage your submitted prompts</li>
+                  <li>• Track approval status and feedback</li>
+                  <li>• Contribute to the {teamRequest?.categories?.name || 'assigned'} category</li>
+                </ul>
+                <Link 
+                  to="/team/dashboard" 
+                  className="inline-flex items-center gap-1.5 btn-primary !py-2 !px-4 text-xs"
+                >
+                  Open Team Dashboard →
+                </Link>
+              </div>
             ) : teamRequest ? (
               <div className={`p-4 rounded-xl border ${
-                teamRequest.status === 'approved' 
-                  ? 'border-cyan/30 bg-cyan/10' 
-                  : teamRequest.status === 'pending'
+                teamRequest.status === 'pending'
                   ? 'border-amber/30 bg-amber/10'
                   : 'border-red-500/30 bg-red-500/10'
               }`}>
                 <div className="flex items-center gap-2 mb-2">
-                  {teamRequest.status === 'approved' && <CheckCircle2 size={16} className="text-cyan" />}
                   {teamRequest.status === 'pending' && <AlertCircle size={16} className="text-amber" />}
                   {teamRequest.status === 'rejected' && <AlertCircle size={16} className="text-red-400" />}
                   <span className={`font-medium capitalize ${
-                    teamRequest.status === 'approved' ? 'text-cyan' :
                     teamRequest.status === 'pending' ? 'text-amber' : 'text-red-400'
                   }`}>
                     {teamRequest.status}
                   </span>
                 </div>
                 <p className="text-sm text-ink-muted mb-3">
-                  {teamRequest.status === 'approved' && 'You are an approved team member! '}
                   {teamRequest.status === 'pending' && 'Your request is being reviewed. '}
                   {teamRequest.status === 'rejected' && 'Your previous request was not approved. '}
                   Category: {teamRequest.categories?.name || 'Any'}
                 </p>
-                {teamRequest.status === 'approved' && (
-                  <Link 
-                    to="/team/dashboard" 
-                    className="inline-flex items-center gap-1.5 btn-primary !py-2 !px-4 text-xs"
-                  >
-                    Go to Team Dashboard →
-                  </Link>
-                )}
               </div>
             ) : (
               <div className="space-y-4">
