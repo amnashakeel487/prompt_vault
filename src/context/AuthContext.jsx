@@ -21,6 +21,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [profileLoading, setProfileLoading] = useState(false)
   const isFetchingRef = useRef(false)
 
   // Fetch admin profile for the logged in user using system client
@@ -30,8 +31,9 @@ export function AuthProvider({ children }) {
       return null
     }
 
-    if (isFetchingRef.current) return null
+    if (isFetchingRef.current) return profile
     isFetchingRef.current = true
+    setProfileLoading(true)
 
     try {
       const { data, error } = await supabaseSystem
@@ -40,7 +42,14 @@ export function AuthProvider({ children }) {
         .eq('id', userId)
         .maybeSingle()
 
-      if (error || !data) {
+      if (error && error.code !== 'PGRST116') {
+        console.warn('Error fetching admin profile:', error)
+        setProfile(null)
+        return null
+      }
+
+      // If no admin profile found, user is not an admin
+      if (!data) {
         setProfile(null)
         return null
       }
@@ -53,37 +62,58 @@ export function AuthProvider({ children }) {
       return null
     } finally {
       isFetchingRef.current = false
+      setProfileLoading(false)
     }
-  }, [])
+  }, [profile])
 
   useEffect(() => {
     let isMounted = true
 
     // 1. Initial session load for system client
-    supabaseSystem.auth.getSession().then(async ({ data: { session } }) => {
+    supabaseSystem.auth.getSession().then(async ({ data: { session }, error }) => {
       if (!isMounted) return
+      
+      if (error) {
+        console.warn('Error getting initial session:', error)
+      }
+
+      console.log('Initial session check:', session?.user?.id)
       setSession(session)
       const currentUser = session?.user ?? null
       setUser(currentUser)
+      
       if (currentUser) {
         await fetchProfile(currentUser.id)
       } else {
         setProfile(null)
       }
+      
       if (isMounted) setLoading(false)
     })
 
     // 2. Auth state subscription for system client
-    const { data: { subscription } } = supabaseSystem.auth.onAuthStateChange(async (_event, newSession) => {
+    const { data: { subscription } } = supabaseSystem.auth.onAuthStateChange(async (event, newSession) => {
       if (!isMounted) return
+      
+      console.log('Auth state changed:', event, newSession?.user?.id)
+      
       setSession(newSession)
       const currentUser = newSession?.user ?? null
       setUser(currentUser)
+      
+      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        // Clear session storage on explicit logout or token refresh failure
+        if (event === 'SIGNED_OUT' && typeof window !== 'undefined') {
+          window.sessionStorage.removeItem('pv-system-auth')
+        }
+      }
+      
       if (currentUser) {
         await fetchProfile(currentUser.id)
       } else {
         setProfile(null)
       }
+      
       if (isMounted) setLoading(false)
     })
 
@@ -94,23 +124,40 @@ export function AuthProvider({ children }) {
   }, [fetchProfile])
 
   const signIn = async ({ email, password }) => {
-    const { data, error } = await supabaseSystem.auth.signInWithPassword({
-      email,
-      password,
-    })
-    if (error) throw error
-    if (data.user) {
-      await fetchProfile(data.user.id)
+    setLoading(true)
+    try {
+      const { data, error } = await supabaseSystem.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (error) throw error
+      
+      if (data.user) {
+        await fetchProfile(data.user.id)
+      }
+      return data
+    } finally {
+      setLoading(false)
     }
-    return data
   }
 
   const signOut = async () => {
-    const { error } = await supabaseSystem.auth.signOut()
-    setProfile(null)
-    setUser(null)
-    setSession(null)
-    if (error) throw error
+    setLoading(true)
+    try {
+      // Clear local storage session identifier
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem('pv-system-auth')
+        window.localStorage.removeItem('sb-' + supabaseSystem.supabaseKey + '-auth-token')
+      }
+      
+      const { error } = await supabaseSystem.auth.signOut()
+      setProfile(null)
+      setUser(null)
+      setSession(null)
+      if (error) throw error
+    } finally {
+      setLoading(false)
+    }
   }
 
   const refreshProfile = async () => {
@@ -125,6 +172,16 @@ export function AuthProvider({ children }) {
   const isAdmin = Boolean(profile && (isSuperAdmin || isCategoryAdmin))
   const assignedCategoryId = profile?.assigned_category_id || null
 
+  // User is authenticated if they have a session AND either:
+  // 1. Profile is still loading (give benefit of doubt during loading)
+  // 2. They have an admin profile  
+  // 3. They have a valid session but profile fetch is still pending
+  const isAuthenticated = Boolean(
+    session && 
+    user && 
+    (profileLoading || isAdmin || (session.expires_at && new Date(session.expires_at * 1000) > new Date()))
+  )
+
   const value = {
     session,
     user,
@@ -134,11 +191,11 @@ export function AuthProvider({ children }) {
     isSuperAdmin,
     isCategoryAdmin,
     isAdmin,
-    loading,
+    loading: loading || profileLoading,
     signIn,
     signOut,
     refreshProfile,
-    isAuthenticated: Boolean(session && user && isAdmin),
+    isAuthenticated,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

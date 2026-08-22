@@ -907,7 +907,7 @@ export default function AdminDashboard() {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="space-y-6">
+        <div className="flex-1 space-y-6 overflow-y-auto">
           {/* Logo */}
           <div className="flex items-center justify-between px-2 pt-2">
             <div className="flex items-center gap-2.5">
@@ -1646,11 +1646,11 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-2.5">
                             <div className="grid h-8 w-8 place-items-center rounded-xl bg-violet/20 text-violet-soft font-bold text-xs shrink-0">
-                              {adm.displayName?.charAt(0).toUpperCase() || 'A'}
+                              {adm.email?.charAt(0).toUpperCase() || adm.displayName?.charAt(0).toUpperCase() || 'A'}
                             </div>
                             <div>
-                              <p className="font-semibold text-ink">{adm.displayName || 'Admin User'}</p>
-                              <p className="text-[11px] text-ink-faint font-mono">{adm.email || adm.id}</p>
+                              <p className="font-semibold text-ink">{adm.email || 'No email'}</p>
+                              <p className="text-[11px] text-ink-faint">{adm.displayName || 'Team Member'}</p>
                             </div>
                           </div>
                         </td>

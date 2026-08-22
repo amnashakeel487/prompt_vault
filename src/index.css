@@ -56,6 +56,15 @@
     --scrollbar-thumb-hover: #94A3B8;
   }
 
+  /* Navigation item styles */
+  .nav-item {
+    @apply w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-xl transition-all duration-200;
+  }
+
+  .nav-item.active {
+    @apply pl-2;
+  }
+
   html {
     scroll-behavior: smooth;
     color: var(--color-ink);

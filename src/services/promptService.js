@@ -843,8 +843,11 @@ export async function getAdminProfiles() {
  * Super Admin: Create a new admin user + profile.
  */
 export async function createAdminUser({ email, password, displayName, role = 'category_admin', assignedCategoryId = null }) {
-  // 1. Sign up user in Supabase Auth
-  const { data: authData, error: authError } = await supabase.auth.signUp({
+  // Import system client dynamically to avoid circular dependency
+  const { supabaseSystem } = await import('./supabaseSystemClient')
+  
+  // 1. Sign up user in Supabase Auth using system client
+  const { data: authData, error: authError } = await supabaseSystem.auth.signUp({
     email: email.trim(),
     password: password.trim(),
     options: {
@@ -864,7 +867,7 @@ export async function createAdminUser({ email, password, displayName, role = 'ca
     throw new Error('User creation returned no ID.')
   }
 
-  // 2. Insert into admin_profiles
+  // 2. Insert into admin_profiles using system client
   const profileRow = {
     id: newUserId,
     role: role || 'category_admin',
@@ -872,7 +875,7 @@ export async function createAdminUser({ email, password, displayName, role = 'ca
     display_name: displayName.trim() || email.split('@')[0],
   }
 
-  const { data: profileData, error: profileError } = await supabase
+  const { data: profileData, error: profileError } = await supabaseSystem
     .from('admin_profiles')
     .insert([profileRow])
     .select('*, categories(id, name, slug)')
@@ -893,15 +896,24 @@ export async function createAdminUser({ email, password, displayName, role = 'ca
  * Super Admin: Update an admin profile's role or assigned category.
  */
 export async function updateAdminProfile(id, { role, assignedCategoryId, displayName }) {
+  // Import system client dynamically to avoid circular dependency
+  const { supabaseSystem } = await import('./supabaseSystemClient')
+  
   const row = {
+    ...(assignedCategoryId !== undefined && { 
+      assigned_category_id: assignedCategoryId || null 
+    }),
     ...(role !== undefined && {
       role,
-      assigned_category_id: role === 'super_admin' ? null : assignedCategoryId || null,
+      assigned_category_id: role === 'super_admin' ? null : (assignedCategoryId !== undefined ? assignedCategoryId || null : undefined),
     }),
     ...(displayName !== undefined && { display_name: displayName.trim() }),
   }
 
-  const { data, error } = await supabase
+  // Remove undefined values
+  Object.keys(row).forEach(key => row[key] === undefined && delete row[key])
+
+  const { data, error } = await supabaseSystem
     .from('admin_profiles')
     .update(row)
     .eq('id', id)
@@ -920,7 +932,10 @@ export async function updateAdminProfile(id, { role, assignedCategoryId, display
  * Super Admin: Delete an admin profile / revoke admin privileges.
  */
 export async function deleteAdminProfile(id) {
-  const { error } = await supabase.from('admin_profiles').delete().eq('id', id)
+  // Import system client dynamically to avoid circular dependency
+  const { supabaseSystem } = await import('./supabaseSystemClient')
+  
+  const { error } = await supabaseSystem.from('admin_profiles').delete().eq('id', id)
   if (error) {
     console.error('Error deleting admin profile:', error)
     throw error
