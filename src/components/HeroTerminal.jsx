@@ -58,7 +58,7 @@ export default function HeroTerminal() {
         <div className="p-4 sm:p-5 font-mono text-xs sm:text-sm leading-relaxed min-h-[110px] sm:min-h-[130px] break-words">
           {tokens.map((tok, i) =>
             tok.type === 'text' ? (
-              <span key={i} className="text-ink/90">{tok.value}</span>
+              <span key={i} className="text-ink font-medium">{tok.value}</span>
             ) : (
               <span key={i} className={showFilled ? 'text-cyan' : 'var-highlight'}>
                 {showFilled ? FILLED_VALUES[tok.value] ?? `{{${tok.value}}}` : `{{${tok.value}}}`}

@@ -1546,7 +1546,7 @@ export default function AdminDashboard() {
                       <p className="text-[10px] font-mono uppercase tracking-wider text-ink-faint font-semibold">
                         Prompt Template Preview
                       </p>
-                      <pre className="font-mono text-xs text-ink/90 whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
+                      <pre className="font-mono text-xs text-ink whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
                         {p.prompt}
                       </pre>
                     </div>

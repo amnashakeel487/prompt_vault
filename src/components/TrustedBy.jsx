@@ -13,7 +13,7 @@ export default function TrustedBy() {
   return (
     <section className="border-y border-line bg-surface/30">
       <div className="section-pad py-6 sm:py-8 text-center">
-        <p className="text-[10px] sm:text-[11px] font-mono uppercase tracking-widest text-ink-muted/80">
+        <p className="text-[10px] sm:text-[11px] font-mono uppercase tracking-widest text-ink-faint font-semibold">
           Trusted by teams shipping content faster
         </p>
 
