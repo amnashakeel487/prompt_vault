@@ -34,16 +34,17 @@ export default function FAQ() {
 
   return (
     <section className="section-pad py-12 sm:py-16">
-      <div className="mb-8 sm:mb-10 text-center md:text-left">
-        <h2 className="font-display text-xl sm:text-2xl md:text-3xl font-semibold text-ink">
-          Frequently asked questions
-        </h2>
-        <p className="mt-1 sm:mt-1.5 text-xs sm:text-sm text-ink-muted">
-          Everything you need to know about using PromptVault prompts.
-        </p>
-      </div>
+      <div className="max-w-3xl mx-auto">
+        <div className="mb-8 sm:mb-10 text-center">
+          <h2 className="font-display text-xl sm:text-2xl md:text-3xl font-semibold text-ink">
+            Frequently asked questions
+          </h2>
+          <p className="mt-1 sm:mt-1.5 text-xs sm:text-sm text-ink-muted max-w-md mx-auto">
+            Everything you need to know about using PromptVault prompts.
+          </p>
+        </div>
 
-      <div className="space-y-3 max-w-4xl">
+        <div className="space-y-3">
         {FAQS.map((item, i) => {
           const isOpen = openIndex === i
           return (
@@ -92,6 +93,7 @@ export default function FAQ() {
             </div>
           )
         })}
+        </div>
       </div>
     </section>
   )

@@ -243,9 +243,12 @@ export default function AdminDashboard() {
     icon: 'Sparkles',
   })
 
-  // Subcategory Quick Add
+  // Subcategory Management State
+  const [submittingSubcat, setSubmittingSubcat] = useState(false)
   const [newSubcatName, setNewSubcatName] = useState('')
   const [subcatParentId, setSubcatParentId] = useState('')
+  const [subcatModalCategory, setSubcatModalCategory] = useState(null)
+  const [showSubcatModal, setShowSubcatModal] = useState(false)
 
   // Profile Form States
   const [newEmail, setNewEmail] = useState(user?.email || '')
@@ -274,13 +277,17 @@ export default function AdminDashboard() {
     try {
       const userProfile = profile || { role, assigned_category_id: assignedCategoryId }
 
-      const [prompts, cats, adminStats, messages, pending, admins, teamRequests] = await Promise.all([
+      const [prompts, cats, subcats, adminStats, messages, pending, admins, teamRequests] = await Promise.all([
         getAdminPrompts(userProfile).catch((err) => {
           console.warn('Failed to load prompts:', err)
           return []
         }),
         getCategories().catch((err) => {
           console.warn('Failed to load categories:', err)
+          return []
+        }),
+        getSubcategories().catch((err) => {
+          console.warn('Failed to load subcategories:', err)
           return []
         }),
         getAdminStats(userProfile).catch((err) => {
@@ -295,6 +302,7 @@ export default function AdminDashboard() {
 
       setPromptsList(prompts || [])
       setCategoriesList(cats || [])
+      setSubcategoriesList(subcats || [])
       setStats(adminStats || { totalPrompts: 0, totalCategories: 0, totalViews: 0, totalCopies: 0, pendingCount: 0 })
 
       if (isSuperAdmin) {
@@ -761,6 +769,55 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error('Error deleting category:', err)
       notify('error', 'Failed to delete category.')
+    }
+  }
+
+  // --- SUBCATEGORIES HANDLERS (Super Admin) ---
+  function openSubcatModalForCategory(cat) {
+    setSubcatModalCategory(cat)
+    setSubcatParentId(cat.id)
+    setNewSubcatName('')
+    setShowSubcatModal(true)
+  }
+
+  async function handleAddSubcategory(e) {
+    e?.preventDefault?.()
+    const targetCatId = subcatParentId || subcatModalCategory?.id
+    if (!targetCatId) {
+      notify('error', 'Please select a parent category.')
+      return
+    }
+    if (!newSubcatName.trim()) {
+      notify('error', 'Please enter a subcategory name.')
+      return
+    }
+    try {
+      setSubmittingSubcat(true)
+      await createSubcategory({
+        categoryId: targetCatId,
+        name: newSubcatName.trim(),
+      })
+      notify('success', `Subcategory "${newSubcatName.trim()}" added.`)
+      setNewSubcatName('')
+      const updatedSubcats = await getSubcategories()
+      setSubcategoriesList(updatedSubcats || [])
+    } catch (err) {
+      console.error('Error adding subcategory:', err)
+      notify('error', 'Failed to create subcategory.')
+    } finally {
+      setSubmittingSubcat(false)
+    }
+  }
+
+  async function handleDeleteSubcategory(id, name) {
+    if (!window.confirm(`Delete subcategory "${name}"?`)) return
+    try {
+      await deleteSubcategory(id)
+      notify('success', `Subcategory "${name}" deleted.`)
+      setSubcategoriesList((prev) => prev.filter((s) => s.id !== id))
+    } catch (err) {
+      console.error('Error deleting subcategory:', err)
+      notify('error', 'Failed to delete subcategory.')
     }
   }
 
@@ -1558,54 +1615,173 @@ export default function AdminDashboard() {
         )}
 
         {/* ------------------------------------------------------------------ */}
-        {/* TAB 3: CATEGORIES & TAGS (Super Admin Only)                       */}
+        {/* TAB 3: CATEGORIES & SUBCATEGORIES (Super Admin Only)               */}
         {/* ------------------------------------------------------------------ */}
         {activeTab === 'categories' && isSuperAdmin && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
+          <div className="space-y-8">
+            {/* Top Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="font-display font-semibold text-lg text-ink">
-                  Categories ({categoriesList.length})
+                  Categories & Subcategories ({categoriesList.length})
                 </h2>
                 <p className="text-xs text-ink-muted">
-                  Create and organize top-level prompt families.
+                  Create and organize prompt categories and nested subcategory niches.
                 </p>
               </div>
-              <button onClick={openNewCatModal} className="btn-primary !py-2 !px-3 text-xs">
-                <Plus size={14} /> Add Category
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setSubcatModalCategory(null)
+                    setSubcatParentId(categoriesList[0]?.id || '')
+                    setNewSubcatName('')
+                    setShowSubcatModal(true)
+                  }}
+                  className="btn-ghost !py-2 !px-3 text-xs"
+                >
+                  <Plus size={14} /> Add Subcategory
+                </button>
+                <button onClick={openNewCatModal} className="btn-primary !py-2 !px-3 text-xs">
+                  <Plus size={14} /> Add Category
+                </button>
+              </div>
             </div>
 
-            <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-              {categoriesList.map((cat) => (
-                <div key={cat.id} className="glass-card p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-violet/10 border border-line text-violet-soft">
-                      <Sparkles size={18} />
-                    </span>
-                    <div>
-                      <h4 className="font-display font-semibold text-sm text-ink">
-                        {cat.name}
-                      </h4>
-                      <p className="text-[11px] text-ink-faint">{cat.count || 0} published prompts</p>
+            {/* Categories & their Subcategories Cards */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {categoriesList.map((cat) => {
+                const catSubcats = subcategoriesList.filter(
+                  (s) => s.categoryId === cat.id || s.category_id === cat.id
+                )
+
+                return (
+                  <div key={cat.id} className="glass-card p-4 flex flex-col justify-between space-y-3">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet/10 border border-line text-violet-soft">
+                          <Sparkles size={18} />
+                        </span>
+                        <div>
+                          <h4 className="font-display font-semibold text-sm text-ink">
+                            {cat.name}
+                          </h4>
+                          <p className="text-[11px] text-ink-faint">
+                            {cat.count || 0} published · {catSubcats.length} subcategories
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditCatModal(cat)}
+                          title="Edit Category"
+                          className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-ink transition-colors"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCat(cat.id, cat.name)}
+                          title="Delete Category"
+                          className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Subcategories Badges List */}
+                    <div className="pt-2 border-t border-line/60">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-ink-faint font-semibold">
+                          Subcategories ({catSubcats.length})
+                        </span>
+                        <button
+                          onClick={() => openSubcatModalForCategory(cat)}
+                          className="text-[11px] text-violet-soft hover:underline flex items-center gap-1 font-medium"
+                        >
+                          <Plus size={11} /> Add
+                        </button>
+                      </div>
+
+                      {catSubcats.length === 0 ? (
+                        <p className="text-[11px] text-ink-faint italic">No subcategories yet</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                          {catSubcats.map((sub) => (
+                            <span
+                              key={sub.id}
+                              className="chip !py-0.5 !px-2 !text-[11px] flex items-center gap-1 bg-surface-2 group"
+                            >
+                              <span>{sub.name}</span>
+                              <button
+                                onClick={() => handleDeleteSubcategory(sub.id, sub.name)}
+                                title={`Delete ${sub.name}`}
+                                className="text-ink-faint hover:text-red-400 transition-colors ml-0.5"
+                              >
+                                <X size={11} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => openEditCatModal(cat)}
-                      className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-ink"
-                    >
-                      <Pencil size={13} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCat(cat.id, cat.name)}
-                      className="p-1.5 rounded-lg border border-line text-ink-muted hover:text-red-400"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
+                )
+              })}
+            </div>
+
+            {/* Quick Add Subcategory Form Section */}
+            <div className="glass-card p-5 space-y-4">
+              <div>
+                <h3 className="font-display font-semibold text-sm text-ink flex items-center gap-2">
+                  <Layers size={16} className="text-cyan" /> Quick Add Subcategory
+                </h3>
+                <p className="text-xs text-ink-muted mt-0.5">
+                  Select a category and add a new subcategory niche to group related prompts.
+                </p>
+              </div>
+
+              <form onSubmit={handleAddSubcategory} className="grid sm:grid-cols-12 gap-3 items-end">
+                <div className="sm:col-span-5">
+                  <label className="block text-ink-muted mb-1 text-xs font-medium">Parent Category *</label>
+                  <select
+                    value={subcatParentId}
+                    onChange={(e) => setSubcatParentId(e.target.value)}
+                    required
+                    aria-label="Parent Category"
+                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-xs text-ink focus:border-violet focus:outline-none"
+                  >
+                    <option value="">Select a Category...</option>
+                    {categoriesList.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ))}
+
+                <div className="sm:col-span-5">
+                  <label className="block text-ink-muted mb-1 text-xs font-medium">Subcategory Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newSubcatName}
+                    onChange={(e) => setNewSubcatName(e.target.value)}
+                    placeholder="e.g. Midjourney v6, SEO Audits, Cold Email"
+                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-xs text-ink focus:border-violet focus:outline-none"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <button
+                    type="submit"
+                    disabled={submittingSubcat || !newSubcatName.trim()}
+                    className="btn-primary w-full !py-2 text-xs justify-center shadow-glow"
+                  >
+                    {submittingSubcat ? <Loader2 size={13} className="animate-spin" /> : <><Plus size={13} /> Add</>}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -2577,6 +2753,115 @@ export default function AdminDashboard() {
                   className="btn-primary !py-2 !px-4 text-xs shadow-glow"
                 >
                   {submittingCat ? <Loader2 size={13} className="animate-spin" /> : 'Save Category'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* MODAL 5: SUBCATEGORY MODAL (Super Admin)                          */}
+      {/* ------------------------------------------------------------------ */}
+      {showSubcatModal && isSuperAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="glass-card w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <div>
+                <h3 className="font-display font-semibold text-base text-ink">
+                  {subcatModalCategory ? `Subcategories for "${subcatModalCategory.name}"` : 'New Subcategory'}
+                </h3>
+                <p className="text-xs text-ink-muted">
+                  Create and manage niche subcategories for this category.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSubcatModal(false)}
+                className="p-1 text-ink-muted hover:text-ink"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* List existing subcategories for this category */}
+            {subcatModalCategory && (
+              <div className="space-y-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-ink-faint font-semibold">
+                  Existing Subcategories
+                </span>
+                <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                  {subcategoriesList
+                    .filter((s) => s.categoryId === subcatModalCategory.id || s.category_id === subcatModalCategory.id)
+                    .map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="flex items-center justify-between p-2 rounded-xl border border-line bg-surface/50 text-xs"
+                      >
+                        <span className="font-medium text-ink">{sub.name}</span>
+                        <button
+                          onClick={() => handleDeleteSubcategory(sub.id, sub.name)}
+                          title={`Delete ${sub.name}`}
+                          className="p-1 text-ink-faint hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  {subcategoriesList.filter((s) => s.categoryId === subcatModalCategory.id || s.category_id === subcatModalCategory.id).length === 0 && (
+                    <p className="text-xs text-ink-faint italic py-2">No subcategories created yet for this category.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Add new subcategory form */}
+            <form onSubmit={handleAddSubcategory} className="space-y-3 pt-2 border-t border-line">
+              {!subcatModalCategory && (
+                <div>
+                  <label className="block text-ink-muted mb-1 text-xs font-medium">Parent Category *</label>
+                  <select
+                    value={subcatParentId}
+                    onChange={(e) => setSubcatParentId(e.target.value)}
+                    required
+                    aria-label="Parent Category"
+                    className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-xs text-ink focus:border-violet focus:outline-none"
+                  >
+                    <option value="">Select a Category...</option>
+                    {categoriesList.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-ink-muted mb-1 text-xs font-medium">New Subcategory Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={newSubcatName}
+                  onChange={(e) => setNewSubcatName(e.target.value)}
+                  placeholder="e.g. Midjourney v6, Cold Email"
+                  className="w-full rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-xs text-ink focus:border-violet focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-line">
+                <button
+                  type="button"
+                  onClick={() => setShowSubcatModal(false)}
+                  className="btn-ghost !py-2 text-xs"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingSubcat || !newSubcatName.trim()}
+                  className="btn-primary !py-2 !px-4 text-xs shadow-glow"
+                >
+                  {submittingSubcat ? <Loader2 size={13} className="animate-spin" /> : 'Add Subcategory'}
                 </button>
               </div>
             </form>
