@@ -803,7 +803,7 @@ export default function AdminDashboard() {
       setSubcategoriesList(updatedSubcats || [])
     } catch (err) {
       console.error('Error adding subcategory:', err)
-      notify('error', 'Failed to create subcategory.')
+      notify('error', err.message || 'Failed to create subcategory.')
     } finally {
       setSubmittingSubcat(false)
     }
@@ -817,7 +817,7 @@ export default function AdminDashboard() {
       setSubcategoriesList((prev) => prev.filter((s) => s.id !== id))
     } catch (err) {
       console.error('Error deleting subcategory:', err)
-      notify('error', 'Failed to delete subcategory.')
+      notify('error', err.message || 'Failed to delete subcategory.')
     }
   }
 

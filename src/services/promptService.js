@@ -217,11 +217,24 @@ export async function getSubcategories(categoryId) {
 /**
  * Admin: Create a new Category.
  */
+/**
+ * Admin: Create a new Category.
+ */
 export async function createCategory(payload) {
+  const cleanName = payload.name?.trim() || ''
+  const generatedSlug = (payload.slug?.trim() || cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')) || `cat-${Date.now()}`
+  
   const row = {
-    name: payload.name.trim(),
-    slug: payload.slug.trim() || payload.name.toLowerCase().replace(/\s+/g, '-'),
+    name: cleanName,
+    slug: generatedSlug,
     icon: payload.icon || 'Sparkles',
+  }
+
+  try {
+    const res = await apiPost('/categories', row)
+    if (res.category) return formatCategory(res.category)
+  } catch (apiErr) {
+    console.warn('Flask API createCategory failed, falling back to client:', apiErr)
   }
 
   const { data, error } = await supabase
@@ -248,6 +261,13 @@ export async function updateCategory(id, payload) {
     ...(payload.icon !== undefined && { icon: payload.icon }),
   }
 
+  try {
+    const res = await apiPut(`/categories/${id}`, row)
+    if (res.category) return formatCategory(res.category)
+  } catch (apiErr) {
+    console.warn('Flask API updateCategory failed, falling back to client:', apiErr)
+  }
+
   const { data, error } = await supabase
     .from('categories')
     .update(row)
@@ -267,6 +287,13 @@ export async function updateCategory(id, payload) {
  * Admin: Delete a Category.
  */
 export async function deleteCategory(id) {
+  try {
+    await apiDelete(`/categories/${id}`)
+    return true
+  } catch (apiErr) {
+    console.warn('Flask API deleteCategory failed, falling back to client:', apiErr)
+  }
+
   const { error } = await supabase.from('categories').delete().eq('id', id)
   if (error) {
     console.error('Error deleting category:', error)
@@ -279,10 +306,20 @@ export async function deleteCategory(id) {
  * Admin: Create a Subcategory.
  */
 export async function createSubcategory(payload) {
+  const cleanName = payload.name?.trim() || ''
+  const generatedSlug = (payload.slug?.trim() || cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')) || `sub-${Date.now()}`
+
   const row = {
     category_id: payload.categoryId || payload.category_id,
-    name: payload.name.trim(),
-    slug: payload.slug.trim() || payload.name.toLowerCase().replace(/\s+/g, '-'),
+    name: cleanName,
+    slug: generatedSlug,
+  }
+
+  try {
+    const res = await apiPost('/categories/subcategories', row)
+    if (res.subcategory) return formatSubcategory(res.subcategory)
+  } catch (apiErr) {
+    console.warn('Flask API createSubcategory failed, falling back to client:', apiErr)
   }
 
   const { data, error } = await supabase
@@ -303,6 +340,13 @@ export async function createSubcategory(payload) {
  * Admin: Delete a Subcategory.
  */
 export async function deleteSubcategory(id) {
+  try {
+    await apiDelete(`/categories/subcategories/${id}`)
+    return true
+  } catch (apiErr) {
+    console.warn('Flask API deleteSubcategory failed, falling back to client:', apiErr)
+  }
+
   const { error } = await supabase.from('subcategories').delete().eq('id', id)
   if (error) {
     console.error('Error deleting subcategory:', error)
