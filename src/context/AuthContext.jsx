@@ -76,6 +76,11 @@ export function AuthProvider({ children }) {
       setSession(session)
       const currentUser = session?.user ?? null
       setUser(currentUser)
+      if (session?.access_token) {
+        localStorage.setItem('pv-system-token', session.access_token)
+      } else {
+        localStorage.removeItem('pv-system-token')
+      }
       
       if (currentUser) {
         await fetchProfile(currentUser.id)
@@ -95,11 +100,17 @@ export function AuthProvider({ children }) {
       setSession(newSession)
       const currentUser = newSession?.user ?? null
       setUser(currentUser)
+      if (newSession?.access_token) {
+        localStorage.setItem('pv-system-token', newSession.access_token)
+      } else {
+        localStorage.removeItem('pv-system-token')
+      }
       
       if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
         // Clear session storage on explicit logout or token refresh failure
         if (event === 'SIGNED_OUT' && typeof window !== 'undefined') {
           window.localStorage.removeItem('pv-system-auth-flag')
+          window.localStorage.removeItem('pv-system-token')
         }
       }
       
@@ -143,6 +154,7 @@ export function AuthProvider({ children }) {
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem('pv-system-auth-flag')
         window.localStorage.removeItem('pv-system-auth')
+        window.localStorage.removeItem('pv-system-token')
       }
       
       const { error } = await supabaseSystem.auth.signOut()

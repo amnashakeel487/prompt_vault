@@ -1,6 +1,7 @@
 import { supabase as publicSupabase } from './supabaseClient'
 import { supabaseSystem } from './supabaseSystemClient'
 import { formatGoogleDriveImageUrl, detectImageSource } from '../utils/googleDrive'
+import { apiGet, apiPost, apiPut, apiDelete } from './apiClient'
 
 function getActiveClient() {
   if (
@@ -501,6 +502,13 @@ export async function getPendingPrompts() {
  * Super Admin: Approve a pending prompt (sets status to 'published').
  */
 export async function approvePrompt(id) {
+  try {
+    const res = await apiPut(`/prompts/${id}/approve`, {})
+    if (res.prompt) return formatPrompt(res.prompt)
+  } catch (apiErr) {
+    console.warn('Flask API approvePrompt failed, falling back to client:', apiErr)
+  }
+
   const { data, error } = await supabase
     .from('prompts')
     .update({
@@ -524,6 +532,13 @@ export async function approvePrompt(id) {
  * Super Admin: Reject a pending prompt with optional reason.
  */
 export async function rejectPrompt(id, reason = '') {
+  try {
+    const res = await apiPut(`/prompts/${id}/reject`, { reason: reason.trim() })
+    if (res.prompt) return formatPrompt(res.prompt)
+  } catch (apiErr) {
+    console.warn('Flask API rejectPrompt failed, falling back to client:', apiErr)
+  }
+
   const { data, error } = await supabase
     .from('prompts')
     .update({

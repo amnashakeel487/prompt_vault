@@ -64,6 +64,11 @@ export function PublicAuthProvider({ children }) {
       setSession(session)
       const currentUser = session?.user ?? null
       setUser(currentUser)
+      if (session?.access_token) {
+        localStorage.setItem('pv-user-token', session.access_token)
+      } else {
+        localStorage.removeItem('pv-user-token')
+      }
       
       if (currentUser) {
         await fetchProfile(currentUser.id)
@@ -80,6 +85,11 @@ export function PublicAuthProvider({ children }) {
       setSession(newSession)
       const currentUser = newSession?.user ?? null
       setUser(currentUser)
+      if (newSession?.access_token) {
+        localStorage.setItem('pv-user-token', newSession.access_token)
+      } else {
+        localStorage.removeItem('pv-user-token')
+      }
       
       if (currentUser) {
         await fetchProfile(currentUser.id)

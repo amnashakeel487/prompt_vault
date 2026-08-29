@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient'
 import { supabaseSystem } from './supabaseSystemClient'
+import { apiGet, apiPost, apiPut } from './apiClient'
 
 function getActiveClient() {
   if (typeof window !== 'undefined' && (window.localStorage.getItem('pv-system-auth') || window.localStorage.getItem('pv-system-auth-flag') || window.sessionStorage.getItem('pv-system-auth'))) {
@@ -12,6 +13,13 @@ function getActiveClient() {
  * Submit a team member request
  */
 export async function submitTeamMemberRequest({ requestedCategoryId, message }) {
+  try {
+    const res = await apiPost('/team/requests', { requestedCategoryId, message })
+    if (res.request) return res.request
+  } catch (apiErr) {
+    console.warn('Flask API submitTeamMemberRequest failed, falling back to client:', apiErr)
+  }
+
   const activeClient = supabase // Always public client for submission
   const { data: { user } } = await activeClient.auth.getUser()
   if (!user) {
