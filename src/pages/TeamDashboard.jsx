@@ -4,13 +4,16 @@ import {
   User, LogOut, Plus, Eye, Clock, CheckCircle, XCircle, Edit3, 
   Tag, FileText, Image as ImageIcon, AlertCircle, Save, X, Menu, Home, BarChart3,
   TrendingUp, Zap, RefreshCw, Copy, Sun, Moon, Settings, HelpCircle,
-  Layers, PenTool, CloudUpload, Loader2, Star, Trash2, AlertTriangle
+  Layers, PenTool, CloudUpload, Loader2, Star, Trash2, AlertTriangle,
+  Download, Upload
 } from 'lucide-react'
 import SEO from '../components/SEO'
 import { usePublicAuth } from '../context/PublicAuthContext'
 import { supabase } from '../services/supabaseClient'
 import { uploadImageToGitHub } from '../services/githubUpload'
 import { extractVariables } from '../utils/variableParser'
+import { exportPromptsToExcel } from '../utils/excelUtils'
+import ExcelImportModal from '../components/ExcelImportModal'
 
 export default function TeamDashboard() {
   const { user, profile, isCategoryAdmin, assignedCategoryId, assignedCategoryName, signOut, loading } = usePublicAuth()
@@ -51,6 +54,80 @@ export default function TeamDashboard() {
   const [directUrlInput, setDirectUrlInput] = useState('')
   const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadError, setUploadError] = useState('')
+
+  // Excel Import / Export States
+  const [showExcelImportModal, setShowExcelImportModal] = useState(false)
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+
+  // Excel Export Handler (scoped to team member's assigned category)
+  const handleExportExcel = () => {
+    try {
+      setIsExportingExcel(true)
+      if (!prompts || prompts.length === 0) {
+        setError('No prompts available to export.')
+        return
+      }
+      const filename = exportPromptsToExcel(prompts, `promptvault-${assignedCategoryName ? assignedCategoryName.toLowerCase().replace(/\s+/g, '-') : 'team'}-prompts`)
+      setSuccess(`Exported ${prompts.length} prompts to ${filename}`)
+    } catch (err) {
+      console.error('Error exporting prompts to Excel:', err)
+      setError(err.message || 'Failed to export prompts.')
+    } finally {
+      setIsExportingExcel(false)
+    }
+  }
+
+  // Excel Import Handler (submits prompts with status = 'pending_review')
+  const handleImportConfirm = async (validRows, errorRows) => {
+    if (!validRows || validRows.length === 0) return
+    let successCount = 0
+    const failedRows = []
+
+    for (const row of validRows) {
+      try {
+        const payload = {
+          title: row.title,
+          slug: row.slug,
+          description: row.description,
+          prompt: row.prompt,
+          category_id: assignedCategoryId || row.category_id,
+          subcategory_id: row.subcategory_id,
+          tags: row.tags,
+          variables: row.variables,
+          author: user?.id,
+          status: 'pending', // Category admins submit to pending review
+          featured_image: row.featured_image,
+          output_image: row.output_image,
+          seo_title: row.seo_title || row.title,
+          seo_description: row.seo_description || row.description,
+          featured: false,
+          popular: false,
+          trending: false,
+          views: 0,
+          copies: 0
+        }
+
+        const { error: insertErr } = await supabase.from('prompts').insert([payload])
+        if (insertErr) throw insertErr
+        successCount++
+      } catch (insertErr) {
+        console.error(`Failed to insert imported prompt "${row.title}":`, insertErr)
+        failedRows.push({ title: row.title, error: insertErr.message })
+      }
+    }
+
+    await loadData()
+
+    if (failedRows.length === 0) {
+      setSuccess(
+        `Successfully imported ${successCount} prompts for review!${errorRows.length > 0 ? ` (${errorRows.length} rows skipped with errors)` : ''}`
+      )
+    } else {
+      setError(
+        `Imported ${successCount} prompts. ${failedRows.length} rows failed during database insertion.`
+      )
+    }
+  }
 
   // Helper function to generate URL slug from title
   const handleAutoSlug = (title) => {
@@ -817,7 +894,30 @@ export default function TeamDashboard() {
                   {activeTab === 'profile' && `Dashboard / Account Settings`}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {activeTab === 'prompts' && !showAddForm && !editingPrompt && (
+                  <>
+                    <button
+                      onClick={handleExportExcel}
+                      disabled={isExportingExcel || prompts.length === 0}
+                      className="px-3.5 py-2 rounded-full border border-line bg-surface/50 text-ink-muted hover:text-ink hover:border-violet/50 transition-all text-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Export category prompts to Excel (.xlsx)"
+                    >
+                      <Download size={13} className={isExportingExcel ? 'animate-bounce' : ''} />
+                      <span>Export Excel</span>
+                    </button>
+
+                    <button
+                      onClick={() => setShowExcelImportModal(true)}
+                      className="px-3.5 py-2 rounded-full border border-line bg-surface/50 text-ink-muted hover:text-ink hover:border-violet/50 transition-all text-xs flex items-center gap-1.5"
+                      title="Bulk import prompts from Excel (.xlsx)"
+                    >
+                      <Upload size={13} />
+                      <span>Import Excel</span>
+                    </button>
+                  </>
+                )}
+
                 <button
                   onClick={loadData}
                   className="p-2 rounded-xl border border-line text-ink-muted hover:text-ink hover:bg-white/[0.04] transition-colors"
@@ -1513,6 +1613,18 @@ export default function TeamDashboard() {
           )}
         </div>
       </main>
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={showExcelImportModal}
+        onClose={() => setShowExcelImportModal(false)}
+        onImportConfirm={handleImportConfirm}
+        categoriesList={categories}
+        subcategoriesList={subcategoriesList}
+        existingPrompts={prompts}
+        isCategoryAdmin={isCategoryAdmin}
+        assignedCategory={categories.find((c) => c.id === assignedCategoryId) || { id: assignedCategoryId, name: assignedCategoryName }}
+      />
     </div>
   )
 }

@@ -10,15 +10,16 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.1",
+    "framer-motion": "^11.3.24",
+    "lucide-react": "^0.424.0",
+    "prismjs": "^1.29.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.0",
     "react-hook-form": "^7.52.2",
-    "framer-motion": "^11.3.24",
     "react-markdown": "^9.0.1",
-    "prismjs": "^1.29.0",
-    "lucide-react": "^0.424.0",
-    "@supabase/supabase-js": "^2.45.1"
+    "react-router-dom": "^6.26.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",

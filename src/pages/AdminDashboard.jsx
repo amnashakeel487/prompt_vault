@@ -58,6 +58,9 @@ import {
   CheckSquare,
   Sun,
   Moon,
+  Download,
+  Upload,
+  FileSpreadsheet,
 } from 'lucide-react'
 import SEO from '../components/SEO'
 import { useAuth } from '../hooks/useAuth'
@@ -97,6 +100,8 @@ import { uploadImageToGitHub } from '../services/githubUpload'
 import { formatGoogleDriveImageUrl, extractGoogleDriveId, detectImageSource } from '../utils/googleDrive'
 import { extractVariables } from '../utils/variableParser'
 import { getUploadErrorSuggestions } from '../utils/configChecker'
+import { exportPromptsToExcel, generateImportTemplate } from '../utils/excelUtils'
+import ExcelImportModal from '../components/ExcelImportModal'
 
 const AVAILABLE_ICONS = [
   { name: 'Sparkles', icon: Sparkles },
@@ -249,6 +254,10 @@ export default function AdminDashboard() {
   const [subcatParentId, setSubcatParentId] = useState('')
   const [subcatModalCategory, setSubcatModalCategory] = useState(null)
   const [showSubcatModal, setShowSubcatModal] = useState(false)
+
+  // Excel Import / Export States
+  const [showExcelImportModal, setShowExcelImportModal] = useState(false)
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
 
   // Profile Form States
   const [newEmail, setNewEmail] = useState(user?.email || '')
@@ -821,6 +830,75 @@ export default function AdminDashboard() {
     }
   }
 
+  // --- EXCEL IMPORT / EXPORT HANDLERS ---
+  const handleExportExcel = () => {
+    try {
+      setIsExportingExcel(true)
+      const promptsToExport = filteredPrompts && filteredPrompts.length > 0 ? filteredPrompts : promptsList
+      if (!promptsToExport || promptsToExport.length === 0) {
+        notify('error', 'No prompts available to export.')
+        return
+      }
+      const filename = exportPromptsToExcel(promptsToExport, 'promptvault-prompts')
+      notify('success', `Exported ${promptsToExport.length} prompts to ${filename}`)
+    } catch (err) {
+      console.error('Error exporting prompts to Excel:', err)
+      notify('error', err.message || 'Failed to export prompts.')
+    } finally {
+      setIsExportingExcel(false)
+    }
+  }
+
+  const handleImportConfirm = async (validRows, errorRows) => {
+    if (!validRows || validRows.length === 0) return
+    let successCount = 0
+    const failedRows = []
+
+    for (const row of validRows) {
+      try {
+        const payload = {
+          title: row.title,
+          slug: row.slug,
+          description: row.description,
+          prompt: row.prompt,
+          categoryId: row.category_id,
+          subcategoryId: row.subcategory_id,
+          tags: row.tags,
+          variables: row.variables,
+          featuredImage: row.featured_image,
+          outputImage: row.output_image,
+          seoTitle: row.seo_title || row.title,
+          seoDescription: row.seo_description || row.description,
+          status: isSuperAdmin ? 'published' : 'pending',
+          featured: false,
+          popular: false,
+          trending: false,
+          images: [],
+        }
+
+        await createPrompt(payload)
+        successCount++
+      } catch (insertErr) {
+        console.error(`Failed to insert imported prompt "${row.title}":`, insertErr)
+        failedRows.push({ title: row.title, error: insertErr.message })
+      }
+    }
+
+    await loadData()
+
+    if (failedRows.length === 0) {
+      notify(
+        'success',
+        `Successfully imported ${successCount} prompts!${errorRows.length > 0 ? ` (${errorRows.length} rows skipped with errors)` : ''}`
+      )
+    } else {
+      notify(
+        'error',
+        `Imported ${successCount} prompts. ${failedRows.length} rows failed during database insertion.`
+      )
+    }
+  }
+
   // --- INBOX HANDLERS ---
   async function handleToggleRead(id, currentRead) {
     try {
@@ -1225,24 +1303,47 @@ export default function AdminDashboard() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Excel Actions (Visible on Prompts Library) */}
+            {activeTab === 'prompts' && (
+              <>
+                <button
+                  onClick={handleExportExcel}
+                  disabled={isExportingExcel || promptsList.length === 0}
+                  className="px-3.5 py-2 rounded-full border border-line/60 bg-surface/30 text-ink-muted hover:text-ink hover:border-violet/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet/30 transition-all text-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Export currently filtered prompts to Excel (.xlsx)"
+                >
+                  <Download size={13} className={isExportingExcel ? 'animate-bounce' : ''} />
+                  <span>Export Excel</span>
+                </button>
+
+                <button
+                  onClick={() => setShowExcelImportModal(true)}
+                  className="px-3.5 py-2 rounded-full border border-line/60 bg-surface/30 text-ink-muted hover:text-ink hover:border-violet/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet/30 transition-all text-xs flex items-center gap-1.5"
+                  title="Bulk import prompts from Excel (.xlsx)"
+                >
+                  <Upload size={13} />
+                  <span>Import Excel</span>
+                </button>
+              </>
+            )}
+
             {/* Refresh Button - Ghost Style */}
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="px-4 py-2 rounded-full border border-line/60 bg-surface/30 text-ink-muted hover:text-ink hover:border-violet/50 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet/30 focus-visible:border-violet/50 transition-all text-xs flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3.5 py-2 rounded-full border border-line/60 bg-surface/30 text-ink-muted hover:text-ink hover:border-violet/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet/30 transition-all text-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Refresh Data"
-              style={{ outline: 'none' }}
             >
-              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline ml-2">Refresh</span>
+              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">Refresh</span>
             </button>
             {/* New Prompt Button - Gradient Style */}
             <button
               onClick={openNewPromptModal}
-              className="bg-gradient-to-r from-violet to-violet-soft text-white py-2 px-4 rounded-full font-medium shadow-glow hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-violet/30 transition-all duration-200 flex items-center gap-2 text-xs"
+              className="bg-gradient-to-r from-violet to-violet-soft text-white py-2 px-4 rounded-full font-medium shadow-glow hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-violet/30 transition-all duration-200 flex items-center gap-1.5 text-xs"
             >
-              <Plus size={14} /> New Prompt
+              <Plus size={14} /> <span>New Prompt</span>
             </button>
           </div>
         </div>
@@ -2868,6 +2969,20 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* MODAL 6: EXCEL IMPORT MODAL                                       */}
+      {/* ------------------------------------------------------------------ */}
+      <ExcelImportModal
+        isOpen={showExcelImportModal}
+        onClose={() => setShowExcelImportModal(false)}
+        onImportConfirm={handleImportConfirm}
+        categoriesList={categoriesList}
+        subcategoriesList={subcategoriesList}
+        existingPrompts={promptsList}
+        isCategoryAdmin={isCategoryAdmin}
+        assignedCategory={assignedCategory}
+      />
     </div>
   )
 }
