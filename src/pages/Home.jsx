@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Sparkles, Heart } from 'lucide-react'
+import { ArrowRight, Sparkles, Heart, DollarSign, ShoppingBag, CreditCard, Smartphone } from 'lucide-react'
 import SEO from '../components/SEO'
 import HeroTerminal from '../components/HeroTerminal'
 import TrustedBy from '../components/TrustedBy'
@@ -191,6 +191,47 @@ export default function Home() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* Marketplace CTA Section */}
+      <section className="section-pad py-12 sm:py-16">
+        <div className="glass-card p-8 sm:p-12 text-center bg-gradient-to-br from-violet/10 via-transparent to-cyan/10 border-violet/20">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <div className="mb-4 flex justify-center">
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-violet/20 to-cyan/20 border border-violet/30">
+                <DollarSign size={32} className="text-violet-soft" />
+              </div>
+            </div>
+            <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink mb-3">
+              Discover Premium Prompts
+            </h2>
+            <p className="text-sm sm:text-base text-ink-muted max-w-2xl mx-auto mb-6">
+              Explore our marketplace of high-quality, expert-crafted prompts. Support creators and get 
+              access to premium content with commercial licenses.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+              <Link to="/marketplace" className="btn-primary flex items-center gap-2">
+                <ShoppingBag size={16} />
+                Browse Marketplace
+              </Link>
+              <div className="text-xs text-ink-muted flex items-center gap-4">
+                <span className="flex items-center gap-1">
+                  <CreditCard size={14} />
+                  Cards accepted
+                </span>
+                <span className="flex items-center gap-1">
+                  <Smartphone size={14} />
+                  JazzCash & Easypaisa
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </section>
 
       {/* 4. FAQ Accordion */}

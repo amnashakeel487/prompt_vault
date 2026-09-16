@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Eye, Copy, Flame } from 'lucide-react'
+import { Eye, Copy, Flame, DollarSign, CreditCard, Smartphone } from 'lucide-react'
 import { extractVariables } from '../utils/variableParser'
+import { formatCurrency } from '../services/paymentService'
 import FavoriteButton from './FavoriteButton'
 
 export default function PromptCard({ prompt, index = 0, onAuthRequired }) {
@@ -56,7 +57,19 @@ export default function PromptCard({ prompt, index = 0, onAuthRequired }) {
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-surface via-transparent to-transparent" />
-              {prompt.trending && (
+              
+              {/* Paid Prompt Badge */}
+              {prompt.isPaid && (
+                <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3">
+                  <div className="chip !border-violet/40 !bg-violet/20 !text-violet-soft flex items-center gap-1 text-[10px] sm:text-xs backdrop-blur-sm">
+                    <DollarSign size={12} />
+                    {formatCurrency(prompt.price)}
+                  </div>
+                </div>
+              )}
+              
+              {/* Trending Badge */}
+              {prompt.trending && !prompt.isPaid && (
                 <span className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 chip !border-amber/30 !bg-amber/10 !text-amber flex items-center gap-1 text-[10px] sm:text-xs">
                   <Flame size={12} /> Trending
                 </span>
@@ -80,7 +93,15 @@ export default function PromptCard({ prompt, index = 0, onAuthRequired }) {
           </div>
 
           <div className="p-3.5 sm:p-4 pt-0 mt-2 border-t border-line/40 flex items-center justify-between text-[11px] sm:text-xs text-ink-faint">
-            <span className="font-mono">{varCount} vars</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono">{varCount} vars</span>
+              {prompt.isPaid && (
+                <div className="flex items-center gap-1 text-violet-soft">
+                  <span>•</span>
+                  <span>{prompt.purchaseCount || 0} sales</span>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-2.5 sm:gap-3">
               <span className="flex items-center gap-1">
                 <Eye size={12} /> {(prompt.views || 0).toLocaleString()}

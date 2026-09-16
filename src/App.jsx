@@ -16,6 +16,7 @@ const PromptDetails = lazy(() => import('./pages/PromptDetails'))
 const SearchResults = lazy(() => import('./pages/SearchResults'))
 const Latest = lazy(() => import('./pages/Latest'))
 const Popular = lazy(() => import('./pages/Popular'))
+const Marketplace = lazy(() => import('./pages/Marketplace'))
 const AdminLogin = lazy(() => import('./pages/AdminLogin'))
 const SystemLogin = lazy(() => import('./pages/SystemLogin'))
 const TeamDashboard = lazy(() => import('./pages/TeamDashboard'))
@@ -103,6 +104,7 @@ export default function App() {
                     <Route path="/search" element={<PageTransition><SearchResults /></PageTransition>} />
                     <Route path="/latest" element={<PageTransition><Latest /></PageTransition>} />
                     <Route path="/popular" element={<PageTransition><Popular /></PageTransition>} />
+                    <Route path="/marketplace" element={<PageTransition><Marketplace /></PageTransition>} />
                     <Route path="/account" element={<PageTransition><UserAccount /></PageTransition>} />
                     <Route path="/admin/login" element={<PageTransition><AdminLogin /></PageTransition>} />
                     <Route path="/system-access/login" element={<PageTransition><SystemLogin /></PageTransition>} />

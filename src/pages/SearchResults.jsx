@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Search, Loader2, SlidersHorizontal } from 'lucide-react'
+import { Search, Loader2, SlidersHorizontal, DollarSign, Gift } from 'lucide-react'
 import SEO from '../components/SEO'
 import PromptCard from '../components/PromptCard'
 import EmptyState from '../components/EmptyState'
@@ -11,15 +11,18 @@ export default function SearchResults() {
   const [params, setParams] = useSearchParams()
   const initialQ = params.get('q') || ''
   const initialSort = params.get('sort') || 'created_at'
+  const initialPaidFilter = params.get('paid') || 'all' // 'all', 'free', 'paid'
   const [query, setQuery] = useState(initialQ)
   const [sortBy, setSortBy] = useState(initialSort)
+  const [paidFilter, setPaidFilter] = useState(initialPaidFilter)
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     setQuery(initialQ)
     setSortBy(initialSort)
-  }, [initialQ, initialSort])
+    setPaidFilter(initialPaidFilter)
+  }, [initialQ, initialSort, initialPaidFilter])
 
   // Debounced URL param update and search execution
   useEffect(() => {
@@ -29,17 +32,30 @@ export default function SearchResults() {
         if (sortBy !== 'created_at') {
           newParams.sort = sortBy
         }
+        if (paidFilter !== 'all') {
+          newParams.paid = paidFilter
+        }
         setParams(newParams)
         
         try {
           setLoading(true)
-          const res = await getPrompts({
+          const searchOptions = {
             search: query.trim(),
             status: 'published',
             sort: sortBy,
             order: 'desc',
             limit: 30,
-          })
+          }
+          
+          // Add paid filter
+          if (paidFilter === 'free') {
+            searchOptions.isPaid = false
+          } else if (paidFilter === 'paid') {
+            searchOptions.isPaid = true
+            searchOptions.saleStatus = 'approved'
+          }
+          
+          const res = await getPrompts(searchOptions)
           setResults(res.prompts)
         } catch (err) {
           console.error('Search error:', err)
@@ -54,7 +70,7 @@ export default function SearchResults() {
     }, 300)
 
     return () => clearTimeout(t)
-  }, [query, sortBy]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query, sortBy, paidFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSortChange(newSort) {
     setSortBy(newSort)
@@ -79,32 +95,63 @@ export default function SearchResults() {
         )}
       </div>
 
-      {/* Sort Controls */}
+      {/* Sort & Filter Controls */}
       {query.trim() && (
-        <div className="mt-4 sm:mt-6 flex items-center gap-3">
-          <div className="flex items-center gap-2 text-xs sm:text-sm text-ink-muted">
-            <SlidersHorizontal size={14} />
-            <span>Sort by:</span>
+        <div className="mt-4 sm:mt-6 space-y-4">
+          {/* Paid/Free Filter */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-ink-muted">
+              <span>Filter:</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'all', label: 'All Prompts', icon: null },
+                { value: 'free', label: 'Free Only', icon: <Gift size={12} /> },
+                { value: 'paid', label: 'Premium Only', icon: <DollarSign size={12} /> },
+              ].map(({ value, label, icon }) => (
+                <button
+                  key={value}
+                  onClick={() => setPaidFilter(value)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full transition-all ${
+                    paidFilter === value
+                      ? 'bg-violet/20 text-violet-soft border border-violet/30'
+                      : 'bg-white/[0.03] text-ink-muted border border-line hover:bg-white/[0.06] hover:text-ink'
+                  }`}
+                >
+                  {icon}
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { value: 'created_at', label: 'Latest' },
-              { value: 'favorites', label: 'Most Favorited' },
-              { value: 'copies', label: 'Most Copied' },
-              { value: 'views', label: 'Most Viewed' },
-            ].map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => handleSortChange(value)}
-                className={`px-3 py-1.5 text-xs rounded-full transition-all ${
-                  sortBy === value
-                    ? 'bg-violet/20 text-violet-soft border border-violet/30'
-                    : 'bg-white/[0.03] text-ink-muted border border-line hover:bg-white/[0.06] hover:text-ink'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          
+          {/* Sort Controls */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-ink-muted">
+              <SlidersHorizontal size={14} />
+              <span>Sort by:</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'created_at', label: 'Latest' },
+                { value: 'favorites', label: 'Most Favorited' },
+                { value: 'copies', label: 'Most Copied' },
+                { value: 'views', label: 'Most Viewed' },
+                ...(paidFilter === 'paid' ? [{ value: 'purchase_count', label: 'Best Selling' }] : []),
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => handleSortChange(value)}
+                  className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                    sortBy === value
+                      ? 'bg-violet/20 text-violet-soft border border-violet/30'
+                      : 'bg-white/[0.03] text-ink-muted border border-line hover:bg-white/[0.06] hover:text-ink'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

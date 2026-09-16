@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getPromptBySlug, getPrompts, incrementPromptViews } from '../services/promptService'
+import { getPromptContentBySlug, getPrompts, incrementPromptViews } from '../services/promptService'
 
 export function usePromptBySlug(slug) {
   const [prompt, setPrompt] = useState(null)
@@ -15,7 +15,7 @@ export function usePromptBySlug(slug) {
       if (!slug) return
       try {
         setLoading(true)
-        const data = await getPromptBySlug(slug)
+        const data = await getPromptContentBySlug(slug)
         if (!isMounted) return
 
         setPrompt(data)

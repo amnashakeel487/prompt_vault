@@ -10,6 +10,7 @@ const links = [
   { to: '/categories', label: 'Categories', hash: 'categories' },
   { to: '/latest', label: 'Latest', hash: 'latest' },
   { to: '/popular', label: 'Popular', hash: 'popular' },
+  { to: '/marketplace', label: 'Marketplace', isExternal: true }, // External link, no hash
 ]
 
 function scrollToSection(hash) {
@@ -59,6 +60,12 @@ export default function Navbar() {
     e.preventDefault()
     setOpen(false)
 
+    // Handle external links (marketplace)
+    if (link.isExternal) {
+      navigate(link.to)
+      return
+    }
+
     if (isHome) {
       scrollToSection(link.hash)
     } else {
@@ -82,14 +89,24 @@ export default function Navbar() {
 
           <nav className="hidden md:flex items-center gap-1">
             {links.map((l) => (
-              <a
-                key={l.to}
-                href={`/#${l.hash}`}
-                onClick={(e) => handleNavClickSimple(e, l)}
-                className="rounded-full px-4 py-2 text-sm transition-colors text-ink-muted hover:text-ink hover:bg-white/[0.05]"
-              >
-                {l.label}
-              </a>
+              l.isExternal ? (
+                <Link
+                  key={l.to}
+                  to={l.to}
+                  className="rounded-full px-4 py-2 text-sm transition-colors text-ink-muted hover:text-ink hover:bg-white/[0.05]"
+                >
+                  {l.label}
+                </Link>
+              ) : (
+                <a
+                  key={l.to}
+                  href={`/#${l.hash}`}
+                  onClick={(e) => handleNavClickSimple(e, l)}
+                  className="rounded-full px-4 py-2 text-sm transition-colors text-ink-muted hover:text-ink hover:bg-white/[0.05]"
+                >
+                  {l.label}
+                </a>
+              )
             ))}
           </nav>
 
@@ -240,14 +257,25 @@ export default function Navbar() {
 
               <div className="flex flex-col divide-y divide-line/30 pt-1">
                 {links.map((l) => (
-                  <a
-                    key={l.to}
-                    href={`/#${l.hash}`}
-                    onClick={(e) => handleNavClickSimple(e, l)}
-                    className="flex items-center min-h-[44px] py-2.5 text-sm font-medium text-ink-muted hover:text-ink transition-colors"
-                  >
-                    {l.label}
-                  </a>
+                  l.isExternal ? (
+                    <Link
+                      key={l.to}
+                      to={l.to}
+                      onClick={() => setOpen(false)}
+                      className="flex items-center min-h-[44px] py-2.5 text-sm font-medium text-ink-muted hover:text-ink transition-colors"
+                    >
+                      {l.label}
+                    </Link>
+                  ) : (
+                    <a
+                      key={l.to}
+                      href={`/#${l.hash}`}
+                      onClick={(e) => handleNavClickSimple(e, l)}
+                      className="flex items-center min-h-[44px] py-2.5 text-sm font-medium text-ink-muted hover:text-ink transition-colors"
+                    >
+                      {l.label}
+                    </a>
+                  )
                 ))}
               </div>
             </div>

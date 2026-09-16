@@ -83,8 +83,11 @@ import {
   markContactMessageAsRead,
   deleteContactMessage,
   getPendingPrompts,
+  getPendingPaidPrompts,
   approvePrompt,
   rejectPrompt,
+  approvePaidPrompt,
+  rejectPaidPrompt,
   getAdminProfiles,
   createAdminUser,
   updateAdminProfile,
@@ -161,6 +164,7 @@ export default function AdminDashboard() {
   // Data States
   const [promptsList, setPromptsList] = useState([])
   const [pendingList, setPendingList] = useState([])
+  const [pendingPaidList, setPendingPaidList] = useState([])
   const [categoriesList, setCategoriesList] = useState([])
   const [subcategoriesList, setSubcategoriesList] = useState([])
   const [messagesList, setMessagesList] = useState([])
@@ -172,6 +176,7 @@ export default function AdminDashboard() {
     totalViews: 0,
     totalCopies: 0,
     pendingCount: 0,
+    pendingPaidCount: 0,
   })
 
   const [loading, setLoading] = useState(true)
@@ -226,6 +231,15 @@ export default function AdminDashboard() {
     reason: '',
   })
   const [rejectingLoading, setRejectingLoading] = useState(false)
+
+  // Paid Prompt Reject Modal State
+  const [rejectPaidModal, setRejectPaidModal] = useState({
+    show: false,
+    promptId: null,
+    promptTitle: '',
+    reason: '',
+  })
+  const [rejectingPaidLoading, setRejectingPaidLoading] = useState(false)
 
   // Admin User Modal State
   const [adminModal, setAdminModal] = useState({
@@ -286,7 +300,7 @@ export default function AdminDashboard() {
     try {
       const userProfile = profile || { role, assigned_category_id: assignedCategoryId }
 
-      const [prompts, cats, subcats, adminStats, messages, pending, admins, teamRequests] = await Promise.all([
+      const [prompts, cats, subcats, adminStats, messages, pending, pendingPaid, admins, teamRequests] = await Promise.all([
         getAdminPrompts(userProfile).catch((err) => {
           console.warn('Failed to load prompts:', err)
           return []
@@ -301,10 +315,11 @@ export default function AdminDashboard() {
         }),
         getAdminStats(userProfile).catch((err) => {
           console.warn('Failed to load stats:', err)
-          return { totalPrompts: 0, totalCategories: 0, totalViews: 0, totalCopies: 0, pendingCount: 0 }
+          return { totalPrompts: 0, totalCategories: 0, totalViews: 0, totalCopies: 0, pendingCount: 0, pendingPaidCount: 0 }
         }),
         isSuperAdmin ? getContactMessages().catch(() => []) : Promise.resolve([]),
         isSuperAdmin ? getPendingPrompts().catch(() => []) : Promise.resolve([]),
+        isSuperAdmin ? getPendingPaidPrompts().catch(() => []) : Promise.resolve([]),
         isSuperAdmin ? getAdminProfiles().catch(() => []) : Promise.resolve([]),
         isSuperAdmin ? getTeamMemberRequests({ status: 'pending' }).catch(() => []) : Promise.resolve([]),
       ])
@@ -312,11 +327,15 @@ export default function AdminDashboard() {
       setPromptsList(prompts || [])
       setCategoriesList(cats || [])
       setSubcategoriesList(subcats || [])
-      setStats(adminStats || { totalPrompts: 0, totalCategories: 0, totalViews: 0, totalCopies: 0, pendingCount: 0 })
+      setStats({ 
+        ...adminStats, 
+        pendingPaidCount: pendingPaid?.length || 0 
+      })
 
       if (isSuperAdmin) {
         setMessagesList(messages || [])
         setPendingList(pending || [])
+        setPendingPaidList(pendingPaid || [])
         setAdminsList(admins || [])
         setTeamRequestsList(teamRequests || [])
       }
@@ -661,6 +680,45 @@ export default function AdminDashboard() {
       notify('error', 'Failed to reject prompt.')
     } finally {
       setRejectingLoading(false)
+    }
+  }
+
+  // --- PAID PROMPT APPROVAL HANDLERS (Super Admin) ---
+  async function handleApprovePaid(id, title) {
+    try {
+      await approvePaidPrompt(id)
+      notify('success', `"${title}" approved for sale on marketplace!`)
+      await loadData()
+    } catch (err) {
+      console.error('Error approving paid prompt:', err)
+      notify('error', 'Failed to approve paid prompt.')
+    }
+  }
+
+  function openRejectPaidModal(p) {
+    setRejectPaidModal({
+      show: true,
+      promptId: p.id,
+      promptTitle: p.title,
+      reason: '',
+    })
+  }
+
+  async function handleConfirmRejectPaid(e) {
+    e.preventDefault()
+    if (!rejectPaidModal.promptId) return
+
+    try {
+      setRejectingPaidLoading(true)
+      await rejectPaidPrompt(rejectPaidModal.promptId, rejectPaidModal.reason)
+      notify('success', `"${rejectPaidModal.promptTitle}" marked as rejected. Seller notified.`)
+      setRejectPaidModal({ show: false, promptId: null, promptTitle: '', reason: '' })
+      await loadData()
+    } catch (err) {
+      console.error('Error rejecting paid prompt:', err)
+      notify('error', 'Failed to reject paid prompt.')
+    } finally {
+      setRejectingPaidLoading(false)
     }
   }
 
@@ -1110,8 +1168,23 @@ export default function AdminDashboard() {
                 }}
                 icon={CheckSquare}
                 label="Pending Review"
-                badge={pendingReviewCount > 0 ? `${pendingReviewCount} review` : 0}
-                badgeColor="amber"
+                badge={pendingList.length > 0 ? `${pendingList.length} review` : 0}
+                badgeType="urgent"
+              />
+            )}
+
+            {/* Paid Prompts Review (Super Admin only) */}
+            {isSuperAdmin && (
+              <SidebarLink
+                active={activeTab === 'pendingPaid'}
+                onClick={() => {
+                  setActiveTab('pendingPaid')
+                  setSidebarOpen(false)
+                }}
+                icon={CheckCircle}
+                label="Paid Prompts Review"
+                badge={pendingPaidList.length > 0 ? `${pendingPaidList.length} paid` : 0}
+                badgeType="urgent"
               />
             )}
 
@@ -1272,6 +1345,7 @@ export default function AdminDashboard() {
             <p className="text-xs font-mono text-ink-muted mb-1">
               Dashboard / {activeTab === 'prompts' && 'Prompts Library'}
               {activeTab === 'pending' && 'Pending Review'}
+              {activeTab === 'pendingPaid' && 'Paid Prompts Review'}
               {activeTab === 'categories' && 'Categories & Tags'}
               {activeTab === 'admins' && 'Admin Team'}
               {activeTab === 'teamRequests' && 'Team Requests'}
@@ -1283,6 +1357,7 @@ export default function AdminDashboard() {
               <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">
                 {activeTab === 'prompts' && 'Prompts Library'}
                 {activeTab === 'pending' && 'Pending Review Queue'}
+                {activeTab === 'pendingPaid' && 'Paid Prompts Review'}
                 {activeTab === 'categories' && 'Categories & Tags'}
                 {activeTab === 'admins' && 'Admin Team Management'}
                 {activeTab === 'teamRequests' && 'Team Member Requests'}
@@ -1370,6 +1445,15 @@ export default function AdminDashboard() {
               value={assignedCategory?.name || 'Assigned'}
               icon={FolderKanban}
               change="Scoped Access"
+            />
+          )}
+          {isSuperAdmin && (
+            <StatCard
+              title="Paid Prompts Review"
+              value={stats.pendingPaidCount}
+              icon={CheckCircle}
+              highlight={stats.pendingPaidCount > 0}
+              change="Marketplace Approval"
             />
           )}
           <StatCard
@@ -1704,6 +1788,134 @@ export default function AdminDashboard() {
                       <p className="text-[10px] font-mono uppercase tracking-wider text-ink-faint font-semibold">
                         Prompt Template Preview
                       </p>
+                      <pre className="font-mono text-xs text-ink whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
+                        {p.prompt}
+                      </pre>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------------ */}
+        {/* TAB 2B: PAID PROMPTS REVIEW (Super Admin Only)                   */}
+        {/* ------------------------------------------------------------------ */}
+        {activeTab === 'pendingPaid' && isSuperAdmin && (
+          <div className="space-y-4">
+            <div className="glass-card p-4 sm:p-5 flex items-center justify-between border-green-500/30 bg-green-500/[0.03]">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-green-500/15 border border-green-500/30 text-green-500">
+                  <CheckCircle size={20} />
+                </span>
+                <div>
+                  <h3 className="font-display font-semibold text-sm sm:text-base text-ink">
+                    Paid Prompts Approval Queue
+                  </h3>
+                  <p className="text-xs text-ink-muted">
+                    Review paid prompts submitted by sellers before they go live on the marketplace.
+                  </p>
+                </div>
+              </div>
+              <span className="chip !border-green-500/40 !bg-green-500/20 !text-green-500 font-mono font-semibold">
+                {pendingPaidList.length} Pending
+              </span>
+            </div>
+
+            {pendingPaidList.length === 0 ? (
+              <div className="glass-card p-12 text-center space-y-2">
+                <CheckCircle2 size={32} className="text-cyan mx-auto" />
+                <p className="font-display text-sm font-semibold text-ink">
+                  No pending paid prompts!
+                </p>
+                <p className="text-xs text-ink-muted">
+                  All seller submissions have been reviewed and approved for the marketplace.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {pendingPaidList.map((p) => (
+                  <div key={p.id} className="glass-card p-4 sm:p-5 space-y-4 border-l-4 border-l-green-500">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                          <span className="chip !border-green-500/40 !bg-green-500/15 !text-green-500 text-[10px] uppercase font-semibold">
+                            Marketplace Review
+                          </span>
+                          <span className="chip !py-0.5 !text-[11px]">
+                            {p.category?.name || 'Unassigned'}
+                          </span>
+                          <span className="chip !border-amber/40 !bg-amber/15 !text-amber text-[10px] font-mono">
+                            PKR {p.price}
+                          </span>
+                          <span className="text-[11px] text-ink-faint font-mono">
+                            By {p.seller_profiles?.display_name || 'Seller'} · {p.createdAt || 'Recently'}
+                          </span>
+                        </div>
+                        <h3 className="font-display font-semibold text-base sm:text-lg text-ink mb-1">
+                          {p.title}
+                        </h3>
+                        <p className="text-xs sm:text-sm text-ink-muted leading-relaxed">
+                          {p.description}
+                        </p>
+                        
+                        {/* Seller Info */}
+                        {p.seller_profiles && (
+                          <div className="mt-2 p-2 rounded-lg bg-surface/30 border border-line">
+                            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-faint font-semibold mb-1">
+                              Seller Information
+                            </p>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-ink">
+                                {p.seller_profiles.display_name}
+                              </span>
+                              <span className="text-ink-muted">•</span>
+                              <span className="text-ink-muted">
+                                {p.seller_profiles.total_sales || 0} sales
+                              </span>
+                              <span className="text-ink-muted">•</span>
+                              <span className="text-ink-muted">
+                                PKR {(p.seller_profiles.total_earnings || 0).toLocaleString()} earned
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleApprovePaid(p.id, p.title)}
+                          className="btn-primary !py-2 !px-3 text-xs bg-green-500 hover:bg-green-500/80 text-white font-semibold"
+                        >
+                          <CheckCircle size={14} /> Approve for Sale
+                        </button>
+                        <button
+                          onClick={() => openRejectPaidModal(p)}
+                          className="btn-ghost !py-2 !px-3 text-xs text-red-400 hover:bg-red-500/10 hover:border-red-500/30"
+                        >
+                          <XCircle size={14} /> Reject
+                        </button>
+                        <button
+                          onClick={() => openEditPromptModal(p)}
+                          className="btn-ghost !py-2 !px-3 text-xs"
+                        >
+                          <Pencil size={14} /> Edit
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Preview Box */}
+                    <div className="rounded-xl border border-line bg-surface/50 p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-mono uppercase tracking-wider text-ink-faint font-semibold">
+                          Paid Prompt Template Preview
+                        </p>
+                        <span className="text-[10px] font-mono text-green-500 font-semibold">
+                          PKR {p.price}
+                        </span>
+                      </div>
                       <pre className="font-mono text-xs text-ink whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
                         {p.prompt}
                       </pre>

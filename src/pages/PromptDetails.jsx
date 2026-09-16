@@ -1,8 +1,8 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
-import { ChevronRight, Eye, Copy, Calendar, Share2, Clock, User, Loader2, ImageIcon, Sparkles } from 'lucide-react'
+import { ChevronRight, Eye, Copy, Calendar, Share2, Clock, User, Loader2, ImageIcon, Sparkles, Lock, CreditCard, DollarSign, ShoppingBag, CheckCircle } from 'lucide-react'
 import SEO from '../components/SEO'
 import CopyButton from '../components/CopyButton'
 import VariableForm from '../components/VariableForm'
@@ -10,8 +10,12 @@ import PromptCard from '../components/PromptCard'
 import EmptyState from '../components/EmptyState'
 import FavoriteButton from '../components/FavoriteButton'
 import PublicAuthModal from '../components/PublicAuthModal'
+import PaymentModal from '../components/PaymentModal'
 import { usePromptBySlug } from '../hooks/usePromptBySlug'
 import { incrementPromptCopies } from '../services/promptService'
+import { checkPurchaseStatus } from '../services/sellerService'
+import { formatCurrency } from '../services/paymentService'
+import { usePublicAuth } from '../context/PublicAuthContext'
 import {
   extractVariables,
   generatePrompt,
@@ -22,14 +26,53 @@ import {
 
 export default function PromptDetails() {
   const { slug } = useParams()
+  const [searchParams] = useSearchParams()
+  const { user } = usePublicAuth()
   const { prompt, related, loading, error } = usePromptBySlug(slug)
   const [values, setValues] = useState({})
   const [localCopyCount, setLocalCopyCount] = useState(null)
-  const [toast, setToast] = useState(false)
+  const [toast, setToast] = useState('')
   const [activeImageIndex, setActiveImageIndex] = useState(0)
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [purchaseStatus, setPurchaseStatus] = useState(null)
+  const [checkingPurchase, setCheckingPurchase] = useState(false)
+
+  // Check for payment success/failure from URL params
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment')
+    const paymentError = searchParams.get('error')
+    
+    if (paymentStatus === 'success') {
+      setToast('Payment successful! You now have access to this prompt.')
+      // Reload the page to get updated prompt with access
+      window.location.reload()
+    } else if (paymentStatus === 'failed') {
+      setToast(paymentError || 'Payment failed. Please try again.')
+    }
+  }, [searchParams])
+
+  // Check purchase status for paid prompts
+  useEffect(() => {
+    async function checkUserPurchase() {
+      if (!prompt?.isPaid || !user?.id || checkingPurchase) return
+      
+      setCheckingPurchase(true)
+      try {
+        const status = await checkPurchaseStatus(user.id, prompt.id)
+        setPurchaseStatus(status)
+      } catch (err) {
+        console.error('Error checking purchase status:', err)
+      } finally {
+        setCheckingPurchase(false)
+      }
+    }
+
+    checkUserPurchase()
+  }, [prompt?.isPaid, prompt?.id, user?.id])
 
   const copyCount = localCopyCount !== null ? localCopyCount : prompt?.copies ?? 0
+  const canAccessPrompt = !prompt?.isPaid || prompt?.canAccess || (user?.id === prompt?.sellerId)
 
   const variables = useMemo(() => {
     if (Array.isArray(prompt?.variables) && prompt.variables.length > 0) {
@@ -103,10 +146,27 @@ export default function PromptDetails() {
   }
 
   function handleCopied() {
+    if (!canAccessPrompt) {
+      if (!user) {
+        setShowAuthModal(true)
+      } else {
+        setShowPaymentModal(true)
+      }
+      return
+    }
+
     setLocalCopyCount((c) => (c !== null ? c + 1 : (prompt.copies || 0) + 1))
     incrementPromptCopies(prompt.id).catch((e) => console.warn('Could not increment copy count:', e))
-    setToast(true)
-    setTimeout(() => setToast(false), 2000)
+    setToast('Copied successfully')
+    setTimeout(() => setToast(''), 2000)
+  }
+
+  function handleUnlockPrompt() {
+    if (!user) {
+      setShowAuthModal(true)
+    } else {
+      setShowPaymentModal(true)
+    }
   }
 
   function handleShare() {
@@ -114,8 +174,8 @@ export default function PromptDetails() {
       navigator.share({ title: prompt.title, url: window.location.href }).catch(() => {})
     } else {
       navigator.clipboard.writeText(window.location.href)
-      setToast(true)
-      setTimeout(() => setToast(false), 2000)
+      setToast('Link copied to clipboard')
+      setTimeout(() => setToast(''), 2000)
     }
   }
 
@@ -178,6 +238,12 @@ export default function PromptDetails() {
               <span className="flex items-center gap-1.5"><Eye size={13} /> {(prompt.views || 0).toLocaleString()} views</span>
               <span className="flex items-center gap-1.5"><Copy size={13} /> {copyCount.toLocaleString()} copies</span>
               <span className="flex items-center gap-1.5"><Clock size={13} /> {readingTime(prompt.prompt)} min read</span>
+              {prompt.isPaid && (
+                <span className="flex items-center gap-1.5 text-violet-soft">
+                  <ShoppingBag size={13} />
+                  {prompt.purchaseCount || 0} sales
+                </span>
+              )}
               <div className="ml-auto">
                 <FavoriteButton 
                   promptId={prompt.id} 
@@ -186,6 +252,17 @@ export default function PromptDetails() {
                 />
               </div>
             </div>
+
+            {/* Price Tag for Paid Prompts */}
+            {prompt.isPaid && (
+              <div className="mt-3 sm:mt-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-violet/20 border border-violet/30">
+                  <DollarSign size={14} className="text-violet-soft" />
+                  <span className="text-violet-soft font-medium">{formatCurrency(prompt.price)}</span>
+                  <span className="text-xs text-violet-soft/70">Premium</span>
+                </div>
+              </div>
+            )}
 
             {prompt.tags && prompt.tags.length > 0 && (
               <div className="mt-3 sm:mt-4 flex flex-wrap gap-1 sm:gap-1.5">
@@ -245,34 +322,87 @@ export default function PromptDetails() {
           </div>
 
           <div className="mt-6 sm:mt-8">
-            <VariableForm variables={variables} onGenerate={handleGenerate} />
+            {canAccessPrompt ? (
+              <VariableForm variables={variables} onGenerate={handleGenerate} />
+            ) : (
+              <div className="glass-card p-6 text-center border border-violet/30 bg-violet/5">
+                <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-violet/20 border border-violet/30">
+                  <Lock size={24} className="text-violet-soft" />
+                </div>
+                <h3 className="font-display text-lg font-semibold text-ink mb-2">
+                  Premium Prompt - {formatCurrency(prompt.price)}
+                </h3>
+                <p className="text-sm text-ink-muted mb-6 max-w-sm mx-auto">
+                  This is a premium prompt. Purchase to access the interactive variable form and full prompt content.
+                </p>
+                <button
+                  onClick={handleUnlockPrompt}
+                  className="btn-primary flex items-center gap-2 mx-auto"
+                >
+                  <CreditCard size={16} />
+                  Unlock Prompt
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="mt-6">
             <h3 className="mb-3 font-display font-semibold text-ink text-base sm:text-lg">
-              Generated prompt
+              {canAccessPrompt ? 'Generated prompt' : 'Prompt Preview'}
             </h3>
-            <div className="glass-card p-4 sm:p-5">
-              <div className="font-mono text-xs sm:text-sm leading-relaxed whitespace-pre-wrap text-ink break-words overflow-x-hidden">
-                {tokens.map((tok, i) =>
-                  tok.type === 'text' ? (
-                    <span key={i}>{tok.value}</span>
-                  ) : (
-                    <span key={i} className="var-highlight">
-                      {values[tok.value] || `{{${tok.value}}}`}
-                    </span>
+            <div className="glass-card p-4 sm:p-5 relative">
+              {/* Blur overlay for paid prompts */}
+              {!canAccessPrompt && (
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-surface/95 backdrop-blur-sm z-10 rounded-xl flex items-end justify-center pb-8">
+                  <div className="text-center">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet/20 border border-violet/30 text-violet-soft font-medium mb-3">
+                      <Lock size={16} />
+                      Content Locked
+                    </div>
+                    <div className="text-sm text-ink-muted mb-4 max-w-xs">
+                      Purchase this premium prompt to see the full content and use interactive variables.
+                    </div>
+                    <button
+                      onClick={handleUnlockPrompt}
+                      className="btn-primary flex items-center gap-2"
+                    >
+                      <CreditCard size={16} />
+                      Buy for {formatCurrency(prompt.price)}
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              <div className={`font-mono text-xs sm:text-sm leading-relaxed whitespace-pre-wrap text-ink break-words overflow-x-hidden ${!canAccessPrompt ? 'filter blur-sm' : ''}`}>
+                {canAccessPrompt ? (
+                  tokens.map((tok, i) =>
+                    tok.type === 'text' ? (
+                      <span key={i}>{tok.value}</span>
+                    ) : (
+                      <span key={i} className="var-highlight">
+                        {values[tok.value] || `{{${tok.value}}}`}
+                      </span>
+                    )
                   )
+                ) : (
+                  // Show truncated preview for paid prompts
+                  <span>
+                    {prompt.prompt.length > 200 ? `${prompt.prompt.substring(0, 200)}...` : prompt.prompt}
+                  </span>
                 )}
               </div>
-              <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
-                <CopyButton text={finalPrompt} onCopied={handleCopied} />
-                <button onClick={handleShare} className="btn-ghost justify-center">
-                  <Share2 size={16} /> Share
-                </button>
-                <span className="text-center sm:text-left sm:ml-auto text-[11px] sm:text-xs text-ink-faint font-mono mt-1 sm:mt-0">
-                  ~{estimateTokens(finalPrompt)} tokens
-                </span>
-              </div>
+              
+              {canAccessPrompt && (
+                <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+                  <CopyButton text={finalPrompt} onCopied={handleCopied} />
+                  <button onClick={handleShare} className="btn-ghost justify-center">
+                    <Share2 size={16} /> Share
+                  </button>
+                  <span className="text-center sm:text-left sm:ml-auto text-[11px] sm:text-xs text-ink-faint font-mono mt-1 sm:mt-0">
+                    ~{estimateTokens(finalPrompt)} tokens
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -292,6 +422,22 @@ export default function PromptDetails() {
                 <dt className="text-ink-faint">Variables</dt>
                 <dd className="text-ink-muted">{variables.length}</dd>
               </div>
+              {prompt.isPaid && (
+                <>
+                  <div className="flex justify-between">
+                    <dt className="text-ink-faint">Price</dt>
+                    <dd className="text-violet-soft font-semibold">{formatCurrency(prompt.price)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-ink-faint">Sales</dt>
+                    <dd className="text-ink-muted">{prompt.purchaseCount || 0}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-ink-faint">Type</dt>
+                    <dd className="text-violet-soft">Premium</dd>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between">
                 <dt className="text-ink-faint">Created</dt>
                 <dd className="text-ink-muted">{prompt.createdAt || '—'}</dd>
@@ -307,6 +453,44 @@ export default function PromptDetails() {
                 </div>
               )}
             </dl>
+
+            {/* Purchase Status for Logged In Users */}
+            {prompt.isPaid && user && (
+              <div className="mt-4 pt-4 border-t border-line">
+                {canAccessPrompt ? (
+                  <div className="flex items-center gap-2 text-green-400 text-sm">
+                    <CheckCircle size={16} />
+                    <span>You own this prompt</span>
+                  </div>
+                ) : checkingPurchase ? (
+                  <div className="flex items-center gap-2 text-ink-muted text-sm">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Checking purchase...</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleUnlockPrompt}
+                    className="w-full btn-primary flex items-center gap-2 justify-center"
+                  >
+                    <Lock size={16} />
+                    Buy for {formatCurrency(prompt.price)}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Login CTA for Non-logged Users */}
+            {prompt.isPaid && !user && (
+              <div className="mt-4 pt-4 border-t border-line">
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="w-full btn-primary flex items-center gap-2 justify-center"
+                >
+                  <User size={16} />
+                  Sign in to Purchase
+                </button>
+              </div>
+            )}
           </div>
 
           {related && related.length > 0 && (
@@ -330,13 +514,24 @@ export default function PromptDetails() {
         className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none max-w-[90vw]"
       >
         <div className="glass-card px-4 py-2 text-xs sm:text-sm text-ink shadow-glow text-center">
-          Copied successfully
+          {toast}
         </div>
       </motion.div>
 
       <PublicAuthModal 
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
+      />
+
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        prompt={prompt}
+        onPaymentSuccess={() => {
+          setShowPaymentModal(false)
+          setToast('Payment successful! Reloading prompt...')
+          setTimeout(() => window.location.reload(), 1000)
+        }}
       />
     </section>
   )

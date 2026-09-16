@@ -93,6 +93,18 @@ export function formatPrompt(raw) {
     content_type: raw.content_type || 'prompt',
     videoUrl: raw.video_url || '',
     video_url: raw.video_url || '',
+    // Marketplace fields
+    isPaid: Boolean(raw.is_paid),
+    is_paid: Boolean(raw.is_paid),
+    price: raw.price ? Number(raw.price) : null,
+    sellerId: raw.seller_id,
+    seller_id: raw.seller_id,
+    saleStatus: raw.sale_status || 'pending_approval',
+    sale_status: raw.sale_status || 'pending_approval',
+    purchaseCount: Number(raw.purchase_count || 0),
+    purchase_count: Number(raw.purchase_count || 0),
+    canAccess: Boolean(raw.can_access), // For paid prompts - whether user can access content
+    can_access: Boolean(raw.can_access),
     createdAt: raw.created_at ? new Date(raw.created_at).toISOString().split('T')[0] : '',
     created_at: raw.created_at,
     updatedAt: raw.updated_at ? new Date(raw.updated_at).toISOString().split('T')[0] : '',
@@ -370,6 +382,11 @@ export async function getPrompts({
   search,
   page = 1,
   limit = 12,
+  // Marketplace filters
+  isPaid,
+  saleStatus,
+  minPrice,
+  maxPrice,
 } = {}) {
   try {
     let query = supabase
@@ -395,6 +412,21 @@ export async function getPrompts({
     if (trending !== undefined) {
       query = query.eq('trending', trending)
     }
+    
+    // Marketplace-specific filters
+    if (isPaid !== undefined) {
+      query = query.eq('is_paid', isPaid)
+    }
+    if (saleStatus) {
+      query = query.eq('sale_status', saleStatus)
+    }
+    if (minPrice !== undefined && minPrice !== '') {
+      query = query.gte('price', Number(minPrice))
+    }
+    if (maxPrice !== undefined && maxPrice !== '') {
+      query = query.lte('price', Number(maxPrice))
+    }
+    
     if (search && search.trim()) {
       const s = search.trim()
       query = query.or(`title.ilike.%${s}%,description.ilike.%${s}%,prompt.ilike.%${s}%`)
@@ -458,6 +490,73 @@ export async function getPromptBySlug(slug) {
   }
 
   return formatPrompt(data)
+}
+
+/**
+ * Fetch prompt content with purchase validation for paid prompts.
+ * Uses the database function that truncates content if user hasn't purchased.
+ */
+export async function getPromptContentBySlug(slug) {
+  // First get the prompt ID from slug
+  const { data: promptData, error: slugError } = await supabase
+    .from('prompts')
+    .select('id')
+    .eq('slug', slug)
+    .single()
+
+  if (slugError || !promptData) {
+    console.error('Error fetching prompt by slug:', slugError)
+    return null
+  }
+
+  // Use the database function that handles purchase validation
+  const { data, error } = await supabase
+    .rpc('get_prompt_content', { prompt_id: promptData.id })
+
+  if (error) {
+    console.error('Error fetching prompt content:', error)
+    // Fallback to regular query if RPC fails
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('prompts')
+      .select('*, categories(*), subcategories(*), prompt_images(*)')
+      .eq('id', promptData.id)
+      .single()
+
+    if (fallbackError) {
+      console.error('Error fetching prompt fallback:', fallbackError)
+      return null
+    }
+
+    return formatPrompt(fallbackData)
+  }
+
+  // The RPC returns a single row, but we need to join with related data
+  if (data && data.length > 0) {
+    const promptRecord = data[0]
+    
+    // Get related data separately
+    const [categoriesData, subcategoriesData, imagesData] = await Promise.all([
+      promptRecord.category_id ? 
+        supabase.from('categories').select('*').eq('id', promptRecord.category_id).single()
+          .then(result => result.data).catch(() => null) 
+        : Promise.resolve(null),
+      promptRecord.subcategory_id ?
+        supabase.from('subcategories').select('*').eq('id', promptRecord.subcategory_id).single()
+          .then(result => result.data).catch(() => null)
+        : Promise.resolve(null),
+      supabase.from('prompt_images').select('*').eq('prompt_id', promptRecord.id)
+        .then(result => result.data || []).catch(() => [])
+    ])
+
+    return formatPrompt({
+      ...promptRecord,
+      categories: categoriesData,
+      subcategories: subcategoriesData,
+      prompt_images: imagesData
+    })
+  }
+
+  return null
 }
 
 /**
@@ -542,6 +641,38 @@ export async function getPendingPrompts() {
   }
 }
 
+export async function getPendingPaidPrompts() {
+  try {
+    const { data, error } = await supabase
+      .from('prompts')
+      .select(`
+        *, 
+        categories(*), 
+        subcategories(*), 
+        prompt_images(*),
+        seller_profiles!prompts_seller_id_fkey(
+          id,
+          display_name,
+          total_earnings,
+          total_sales
+        )
+      `)
+      .eq('is_paid', true)
+      .eq('sale_status', 'pending_approval')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.warn('Error fetching pending paid prompts:', error.message)
+      return []
+    }
+
+    return (data || []).map(formatPrompt)
+  } catch (err) {
+    console.warn('Error in getPendingPaidPrompts:', err)
+    return []
+  }
+}
+
 /**
  * Super Admin: Approve a pending prompt (sets status to 'published').
  */
@@ -600,6 +731,59 @@ export async function rejectPrompt(id, reason = '') {
   }
 
   return formatPrompt(data)
+}
+
+export async function approvePaidPrompt(id) {
+  try {
+    console.log('Approving paid prompt for sale:', { id })
+    const { data, error } = await supabase
+      .from('prompts')
+      .update({
+        sale_status: 'approved',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error approving paid prompt:', error)
+      throw error
+    }
+
+    console.log('Paid prompt approved successfully:', data)
+    return formatPrompt(data)
+  } catch (err) {
+    console.error('Error in approvePaidPrompt:', err)
+    throw err
+  }
+}
+
+export async function rejectPaidPrompt(id, reason = '') {
+  try {
+    console.log('Rejecting paid prompt:', { id, reason })
+    const { data, error } = await supabase
+      .from('prompts')
+      .update({
+        sale_status: 'rejected',
+        rejection_reason: reason.trim(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error rejecting paid prompt:', error)
+      throw error
+    }
+
+    console.log('Paid prompt rejected successfully:', data)
+    return formatPrompt(data)
+  } catch (err) {
+    console.error('Error in rejectPaidPrompt:', err)
+    throw err
+  }
 }
 
 /**
