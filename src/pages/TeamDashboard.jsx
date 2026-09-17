@@ -38,7 +38,7 @@ export default function TeamDashboard() {
   const [paidSubcategoriesList, setPaidSubcategoriesList] = useState([])
   const [sellerLoading, setSellerLoading] = useState({ main: false, earnings: false, prompts: false, becomingSeller: false, submitting: false })
   const [paidPromptForm, setPaidPromptForm] = useState({
-    title: '', slug: '', categoryId: '', subcategoryId: '', price: '',
+    title: '', slug: '', categoryId: assignedCategoryId || '', subcategoryId: '', price: '',
     description: '', prompt: '', tags: '', featuredImage: ''
   })
 
@@ -442,13 +442,35 @@ export default function TeamDashboard() {
     } catch { setPaidSubcategoriesList([]) }
   }
 
+  const handleOpenPaidPromptModal = () => {
+    const defaultCat = assignedCategoryId || (categories[0]?.id || '')
+    setPaidPromptForm({
+      title: '',
+      slug: '',
+      categoryId: defaultCat,
+      subcategoryId: '',
+      price: '',
+      description: '',
+      prompt: '',
+      tags: '',
+      featuredImage: ''
+    })
+    if (defaultCat) {
+      getSubcategories(defaultCat)
+        .then(subs => setPaidSubcategoriesList(subs || []))
+        .catch(() => setPaidSubcategoriesList([]))
+    }
+    setShowCreatePaidPromptModal(true)
+  }
+
   const handleSubmitPaidPrompt = async (e) => {
     e.preventDefault()
     setError('')
     setSuccess('')
+    const targetCategoryId = paidPromptForm.categoryId || assignedCategoryId
     const priceNum = Number(paidPromptForm.price)
     if (!paidPromptForm.title.trim()) { setError('Title is required.'); return }
-    if (!paidPromptForm.categoryId) { setError('Please select a category.'); return }
+    if (!targetCategoryId) { setError('Please select a category.'); return }
     if (isNaN(priceNum) || priceNum <= 0) { setError('Please enter a valid price in PKR.'); return }
     if (!paidPromptForm.prompt.trim()) { setError('Prompt content is required.'); return }
 
@@ -464,7 +486,7 @@ export default function TeamDashboard() {
       await createPaidPrompt({
         title: paidPromptForm.title.trim(),
         slug,
-        category_id: paidPromptForm.categoryId,
+        category_id: targetCategoryId,
         subcategory_id: paidPromptForm.subcategoryId || null,
         description: paidPromptForm.description.trim() || paidPromptForm.title.trim(),
         prompt: paidPromptForm.prompt.trim(),
@@ -473,7 +495,7 @@ export default function TeamDashboard() {
         variables: parsedVars,
         tags: parsedTags,
         featured_image: paidPromptForm.featuredImage.trim() || null,
-        author: user.email?.split('@')[0] || 'Seller'
+        author: user.id
       })
 
       setSuccess('🎉 Paid prompt submitted for admin review! It will appear on the Marketplace once approved.')
@@ -1842,7 +1864,7 @@ export default function TeamDashboard() {
                         <p className="text-xs text-ink-muted">Monetized prompts submitted to the marketplace</p>
                       </div>
                       <button
-                        onClick={() => setShowCreatePaidPromptModal(true)}
+                        onClick={handleOpenPaidPromptModal}
                         className="btn-primary flex items-center gap-1.5 !py-2 !px-4 text-xs"
                       >
                         <Plus size={15} />
@@ -1858,7 +1880,7 @@ export default function TeamDashboard() {
                           Create your first premium prompt to monetize your expertise on PromptVault.
                         </p>
                         <button
-                          onClick={() => setShowCreatePaidPromptModal(true)}
+                          onClick={handleOpenPaidPromptModal}
                           className="btn-primary !py-2 !px-4 text-xs inline-flex items-center gap-1.5"
                         >
                           <Plus size={14} /> Create Paid Listing
@@ -1985,15 +2007,15 @@ export default function TeamDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-ink mb-1">
-                    Category <span className="text-red-400">*</span>
+                    Category {assignedCategoryId && <span className="text-violet-soft font-normal">(Locked to {assignedCategoryName})</span>}
                   </label>
                   <select
                     required
-                    value={paidPromptForm.categoryId}
+                    disabled={Boolean(assignedCategoryId)}
+                    value={paidPromptForm.categoryId || assignedCategoryId || ''}
                     onChange={(e) => handlePaidCategoryChange(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none focus:border-violet"
+                    className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none focus:border-violet disabled:opacity-75 disabled:cursor-not-allowed"
                   >
-                    <option value="">Select a category</option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -2008,7 +2030,7 @@ export default function TeamDashboard() {
                   <select
                     value={paidPromptForm.subcategoryId}
                     onChange={(e) => setPaidPromptForm(prev => ({ ...prev, subcategoryId: e.target.value }))}
-                    disabled={!paidPromptForm.categoryId || paidSubcategoriesList.length === 0}
+                    disabled={paidSubcategoriesList.length === 0}
                     className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none focus:border-violet disabled:opacity-50"
                   >
                     <option value="">None / General</option>
