@@ -81,7 +81,7 @@ export default function PromptDetails() {
   const canAccessPrompt =
     !prompt?.isPaid ||
     prompt?.canAccess ||
-    (user?.id && user.id === prompt?.sellerId) ||
+    (user?.id && (user.id === prompt?.sellerId || user.id === prompt?.seller_id || user.id === prompt?.author)) ||
     purchaseStatus?.status === 'completed'
 
   const variables = useMemo(() => {
@@ -360,30 +360,28 @@ export default function PromptDetails() {
             <h3 className="mb-3 font-display font-semibold text-ink text-base sm:text-lg">
               {canAccessPrompt ? 'Generated prompt' : 'Prompt Preview'}
             </h3>
-            <div className="glass-card p-4 sm:p-5 relative">
+            <div className={`glass-card p-4 sm:p-6 relative overflow-hidden ${!canAccessPrompt ? 'min-h-[230px] flex items-center justify-center' : ''}`}>
               {/* Blur overlay for paid prompts */}
               {!canAccessPrompt && (
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-surface/95 backdrop-blur-sm z-10 rounded-xl flex items-end justify-center pb-8">
-                  <div className="text-center">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet/20 border border-violet/30 text-violet-soft font-medium mb-3">
-                      <Lock size={16} />
-                      Content Locked
-                    </div>
-                    <div className="text-sm text-ink-muted mb-4 max-w-xs">
-                      Purchase this premium prompt to see the full content and use interactive variables.
-                    </div>
-                    <button
-                      onClick={handleUnlockPrompt}
-                      className="btn-primary flex items-center gap-2"
-                    >
-                      <CreditCard size={16} />
-                      Buy for {formatCurrency(prompt.price)}
-                    </button>
+                <div className="absolute inset-0 bg-surface/85 backdrop-blur-md z-10 flex flex-col items-center justify-center p-6 text-center">
+                  <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-violet/20 border border-violet/30 text-violet-soft text-xs font-semibold mb-2.5 shadow-sm">
+                    <Lock size={13} />
+                    <span>Content Locked Behind Paywall</span>
                   </div>
+                  <p className="text-xs sm:text-sm text-ink-muted mb-4 max-w-sm leading-relaxed">
+                    Purchase this premium prompt to unlock the full text, fill variables interactively, and copy with one click.
+                  </p>
+                  <button
+                    onClick={handleUnlockPrompt}
+                    className="btn-primary flex items-center gap-2 !py-2.5 !px-6 text-xs sm:text-sm font-semibold shadow-glow"
+                  >
+                    <CreditCard size={15} />
+                    <span>Unlock Full Prompt · {formatCurrency(prompt.price)}</span>
+                  </button>
                 </div>
               )}
               
-              <div className={`font-mono text-xs sm:text-sm leading-relaxed whitespace-pre-wrap text-ink break-words overflow-x-hidden ${!canAccessPrompt ? 'filter blur-sm' : ''}`}>
+              <div className={`font-mono text-xs sm:text-sm leading-relaxed whitespace-pre-wrap text-ink break-words overflow-x-hidden w-full ${!canAccessPrompt ? 'filter blur-md opacity-25 select-none pointer-events-none' : ''}`}>
                 {canAccessPrompt ? (
                   tokens.map((tok, i) =>
                     tok.type === 'text' ? (
@@ -395,10 +393,12 @@ export default function PromptDetails() {
                     )
                   )
                 ) : (
-                  // Show truncated preview for paid prompts
-                  <span>
-                    {prompt.prompt.length > 200 ? `${prompt.prompt.substring(0, 200)}...` : prompt.prompt}
-                  </span>
+                  // Show blurred preview with placeholder structure so short text doesn't collapse
+                  <div className="space-y-2">
+                    <p>{prompt.prompt || 'Act as a professional domain expert and provide a comprehensive response...'}</p>
+                    <p>Tailor your outputs specifically targeting high engagement, precision, and measurable outcome.</p>
+                    <p>[Detailed parameters, dynamic variables, and step-by-step framework locked]</p>
+                  </div>
                 )}
               </div>
               
