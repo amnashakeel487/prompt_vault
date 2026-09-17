@@ -15,6 +15,10 @@ export function usePrompts(options = {}) {
     limit = 12,
     initialPage = 1,
     infinite = false,
+    isPaid,
+    saleStatus,
+    minPrice,
+    maxPrice,
   } = options
 
   const [prompts, setPrompts] = useState([])
@@ -39,6 +43,10 @@ export function usePrompts(options = {}) {
         search,
         page: targetPage,
         limit,
+        isPaid,
+        saleStatus,
+        minPrice,
+        maxPrice,
       })
 
       if (res.error) {
@@ -64,7 +72,7 @@ export function usePrompts(options = {}) {
     } finally {
       setLoading(false)
     }
-  }, [categoryId, subcategoryId, sort, order, status, featured, popular, trending, search, limit])
+  }, [categoryId, subcategoryId, sort, order, status, featured, popular, trending, search, limit, isPaid, saleStatus, minPrice, maxPrice])
 
   useEffect(() => {
     fetchPromptsData(1, false)

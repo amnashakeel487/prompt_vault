@@ -227,6 +227,7 @@ def approve_prompt(prompt_id):
     try:
         res = client.table('prompts').update({
             'status': 'published',
+            'sale_status': 'approved',
             'rejection_reason': None
         }).eq('id', prompt_id).execute()
         return jsonify({'prompt': res.data[0] if res.data else None})
@@ -243,6 +244,7 @@ def reject_prompt(prompt_id):
     try:
         res = client.table('prompts').update({
             'status': 'rejected',
+            'sale_status': 'rejected',
             'rejection_reason': reason
         }).eq('id', prompt_id).execute()
         return jsonify({'prompt': res.data[0] if res.data else None})

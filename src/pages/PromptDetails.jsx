@@ -44,13 +44,19 @@ export default function PromptDetails() {
     const paymentError = searchParams.get('error')
     
     if (paymentStatus === 'success') {
-      setToast('Payment successful! You now have access to this prompt.')
-      // Reload the page to get updated prompt with access
-      window.location.reload()
-    } else if (paymentStatus === 'failed') {
-      setToast(paymentError || 'Payment failed. Please try again.')
+      setToast('Payment completed! Verifying access...')
+      if (prompt?.id && user?.id) {
+        checkPurchaseStatus(user.id, prompt.id).then((status) => {
+          setPurchaseStatus(status)
+          if (status?.status === 'completed') {
+            setToast('Purchase verified! Prompt unlocked.')
+          }
+        }).catch(console.error)
+      }
+    } else if (paymentStatus === 'failed' || paymentStatus === 'cancelled') {
+      setToast(paymentError || 'Payment was not completed. Please try again.')
     }
-  }, [searchParams])
+  }, [searchParams, prompt?.id, user?.id])
 
   // Check purchase status for paid prompts
   useEffect(() => {
@@ -72,7 +78,11 @@ export default function PromptDetails() {
   }, [prompt?.isPaid, prompt?.id, user?.id])
 
   const copyCount = localCopyCount !== null ? localCopyCount : prompt?.copies ?? 0
-  const canAccessPrompt = !prompt?.isPaid || prompt?.canAccess || (user?.id === prompt?.sellerId)
+  const canAccessPrompt =
+    !prompt?.isPaid ||
+    prompt?.canAccess ||
+    (user?.id && user.id === prompt?.sellerId) ||
+    purchaseStatus?.status === 'completed'
 
   const variables = useMemo(() => {
     if (Array.isArray(prompt?.variables) && prompt.variables.length > 0) {

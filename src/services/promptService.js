@@ -497,12 +497,15 @@ export async function getPromptBySlug(slug) {
  * Uses the database function that truncates content if user hasn't purchased.
  */
 export async function getPromptContentBySlug(slug) {
-  // First get the prompt ID from slug
-  const { data: promptData, error: slugError } = await supabase
-    .from('prompts')
-    .select('id')
-    .eq('slug', slug)
-    .single()
+  // First get the prompt ID from slug or direct ID
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
+  let promptQuery = supabase.from('prompts').select('id')
+  if (isUuid) {
+    promptQuery = promptQuery.or(`slug.eq.${slug},id.eq.${slug}`)
+  } else {
+    promptQuery = promptQuery.eq('slug', slug)
+  }
+  const { data: promptData, error: slugError } = await promptQuery.maybeSingle()
 
   if (slugError || !promptData) {
     console.error('Error fetching prompt by slug:', slugError)
@@ -688,6 +691,7 @@ export async function approvePrompt(id) {
     .from('prompts')
     .update({
       status: 'published',
+      sale_status: 'approved',
       rejection_reason: null,
       updated_at: new Date().toISOString(),
     })
@@ -718,6 +722,7 @@ export async function rejectPrompt(id, reason = '') {
     .from('prompts')
     .update({
       status: 'rejected',
+      sale_status: 'rejected',
       rejection_reason: reason.trim(),
       updated_at: new Date().toISOString(),
     })

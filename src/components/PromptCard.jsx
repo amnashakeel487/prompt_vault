@@ -60,10 +60,17 @@ export default function PromptCard({ prompt, index = 0, onAuthRequired }) {
               
               {/* Paid Prompt Badge */}
               {prompt.isPaid && (
-                <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3">
-                  <div className="chip !border-violet/40 !bg-violet/20 !text-violet-soft flex items-center gap-1 text-[10px] sm:text-xs backdrop-blur-sm">
-                    <DollarSign size={12} />
-                    {formatCurrency(prompt.price)}
+                <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-10 flex items-center gap-1.5">
+                  <div
+                    className="chip !border-violet/50 !bg-violet/30 !text-white flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold backdrop-blur-md shadow-sm"
+                    title="Paid Prompt - Pay via Card (Stripe), JazzCash, or Easypaisa"
+                  >
+                    <span className="font-mono text-cyan">{formatCurrency(prompt.price)}</span>
+                    <span className="opacity-40">|</span>
+                    <span className="flex items-center gap-1 text-[9px] text-ink-muted">
+                      <CreditCard size={11} className="text-violet-soft" title="Card (Stripe)" />
+                      <Smartphone size={11} className="text-green-400" title="JazzCash / Easypaisa" />
+                    </span>
                   </div>
                 </div>
               )}

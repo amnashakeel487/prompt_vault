@@ -1338,6 +1338,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Content sections continue as before... */}
+
         {/* TOP HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line/60 pb-6">
           <div>
@@ -1745,11 +1747,20 @@ export default function AdminDashboard() {
                           <span className="chip !border-amber/40 !bg-amber/15 !text-amber text-[10px] uppercase font-semibold">
                             Pending Review
                           </span>
+                          {p.isPaid ? (
+                            <span className="chip !border-violet/40 !bg-violet/15 !text-violet-soft text-[10px] font-semibold">
+                              💰 Paid Listing · Rs. {p.price}
+                            </span>
+                          ) : (
+                            <span className="chip !border-line !bg-white/[0.03] !text-ink-muted text-[10px]">
+                              Free Prompt
+                            </span>
+                          )}
                           <span className="chip !py-0.5 !text-[11px]">
                             {p.category?.name || 'Unassigned'}
                           </span>
                           <span className="text-[11px] text-ink-faint font-mono">
-                            Submitted by {p.author || 'Admin'} · {p.createdAt || 'Recently'}
+                            {p.isPaid ? `Seller submission · ${p.createdAt || 'Recently'}` : `Submitted by ${p.author || 'Admin'} · ${p.createdAt || 'Recently'}`}
                           </span>
                         </div>
                         <h3 className="font-display font-semibold text-base sm:text-lg text-ink">

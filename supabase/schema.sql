@@ -841,7 +841,7 @@ CREATE INDEX IF NOT EXISTS idx_purchases_created_at ON public.purchases(created_
 -- ==============================================================================
 
 -- Check if a user has purchased a specific prompt
-CREATE OR REPLACE FUNCTION public.has_purchased_prompt(user_id UUID, prompt_id TEXT)
+CREATE OR REPLACE FUNCTION public.has_purchased_prompt(p_user_id UUID, p_prompt_id TEXT)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -850,15 +850,15 @@ AS $$
 BEGIN
     RETURN EXISTS (
         SELECT 1 FROM public.purchases
-        WHERE buyer_id = user_id 
-        AND prompt_id = prompt_id 
+        WHERE buyer_id = p_user_id 
+        AND purchases.prompt_id = p_prompt_id 
         AND status = 'completed'
     );
 END;
 $$;
 
 -- Get prompt content with purchase validation
-CREATE OR REPLACE FUNCTION public.get_prompt_content(prompt_id TEXT)
+CREATE OR REPLACE FUNCTION public.get_prompt_content(p_prompt_id TEXT)
 RETURNS TABLE(
     id TEXT,
     title TEXT,
@@ -930,7 +930,7 @@ BEGIN
             ELSE FALSE
         END as can_access
     FROM public.prompts p
-    WHERE p.id = prompt_id;
+    WHERE p.id = p_prompt_id;
 END;
 $$;
 
