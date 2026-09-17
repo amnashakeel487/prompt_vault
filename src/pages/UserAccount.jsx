@@ -454,76 +454,100 @@ export default function UserAccount() {
             )}
           </div>
 
-          {/* Seller Status */}
-          <div className="border-t border-line pt-6">
-            <h3 className="font-display font-semibold text-ink mb-4 flex items-center gap-2">
-              <ShoppingBag size={20} />
-              Seller Status
-            </h3>
-            
-            {sellerProfile ? (
-              <div className="p-4 rounded-xl border border-green-500/30 bg-green-500/10">
-                <div className="flex items-center gap-2 mb-3">
-                  <CheckCircle2 size={18} className="text-green-400" />
-                  <span className="font-medium text-green-400">🎉 You're a Seller!</span>
-                </div>
-                <p className="text-sm text-ink-muted mb-4">
-                  You can now create and sell paid prompts. All paid prompts require admin approval before they become available for purchase.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setActiveTab('seller')}
-                    className="inline-flex items-center gap-1.5 btn-primary !py-2 !px-4 text-xs"
-                  >
-                    View Seller Dashboard
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('seller')
-                      setShowCreatePromptModal(true)
-                    }}
-                    className="inline-flex items-center gap-1.5 btn-ghost !py-2 !px-4 text-xs"
-                  >
-                    Create Paid Prompt →
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-ink-muted text-sm">
-                  Become a seller to create and monetize premium prompts. Earn money from your expertise and creativity.
-                </p>
-                <div className="flex items-center justify-between p-4 border border-line rounded-xl">
-                  <div>
-                    <div className="font-medium text-ink">Become a Seller</div>
-                    <div className="text-sm text-ink-muted">Start selling prompts and earn money</div>
+          {/* Seller Status — only shown to regular users; team members manage seller features from their Team Dashboard */}
+          {isCategoryAdmin ? (
+            <div className="border-t border-line pt-6">
+              <div className="p-4 rounded-xl border border-violet/20 bg-violet/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="font-medium text-ink flex items-center gap-2 mb-1">
+                    <ShoppingBag size={16} className="text-violet-soft" />
+                    {sellerProfile ? '🎉 Seller features active' : 'Want to sell prompts?'}
                   </div>
-                  <button
-                    onClick={handleBecomeSeller}
-                    disabled={loading.becomingSeller}
-                    className="btn-primary flex items-center gap-2"
-                  >
-                    {loading.becomingSeller ? (
-                      <>Processing...</>
-                    ) : (
-                      <>
-                        <DollarSign size={16} />
-                        Become Seller
-                      </>
-                    )}
-                  </button>
+                  <p className="text-xs text-ink-muted">
+                    {sellerProfile
+                      ? 'Your seller dashboard, listings, and earnings are all inside the Team Dashboard.'
+                      : 'You can become a seller and manage paid listings from inside your Team Dashboard.'}
+                  </p>
                 </div>
-                
-                {error && (
-                  <div className="text-red-400 text-sm">{error}</div>
-                )}
-
-                {success && (
-                  <div className="text-green-400 text-sm">{success}</div>
-                )}
+                <Link
+                  to="/team/dashboard"
+                  className="inline-flex items-center gap-1.5 btn-primary !py-2 !px-4 text-xs whitespace-nowrap shrink-0"
+                >
+                  Open Team Dashboard →
+                </Link>
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="border-t border-line pt-6">
+              <h3 className="font-display font-semibold text-ink mb-4 flex items-center gap-2">
+                <ShoppingBag size={20} />
+                Seller Status
+              </h3>
+            
+              {sellerProfile ? (
+                <div className="p-4 rounded-xl border border-green-500/30 bg-green-500/10">
+                  <div className="flex items-center gap-2 mb-3">
+                    <CheckCircle2 size={18} className="text-green-400" />
+                    <span className="font-medium text-green-400">🎉 You're a Seller!</span>
+                  </div>
+                  <p className="text-sm text-ink-muted mb-4">
+                    You can now create and sell paid prompts. All paid prompts require admin approval before they become available for purchase.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setActiveTab('seller')}
+                      className="inline-flex items-center gap-1.5 btn-primary !py-2 !px-4 text-xs"
+                    >
+                      View Seller Dashboard
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('seller')
+                        setShowCreatePromptModal(true)
+                      }}
+                      className="inline-flex items-center gap-1.5 btn-ghost !py-2 !px-4 text-xs"
+                    >
+                      Create Paid Prompt →
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-ink-muted text-sm">
+                    Become a seller to create and monetize premium prompts. Earn money from your expertise and creativity.
+                  </p>
+                  <div className="flex items-center justify-between p-4 border border-line rounded-xl">
+                    <div>
+                      <div className="font-medium text-ink">Become a Seller</div>
+                      <div className="text-sm text-ink-muted">Start selling prompts and earn money</div>
+                    </div>
+                    <button
+                      onClick={handleBecomeSeller}
+                      disabled={loading.becomingSeller}
+                      className="btn-primary flex items-center gap-2"
+                    >
+                      {loading.becomingSeller ? (
+                        <>Processing...</>
+                      ) : (
+                        <>
+                          <DollarSign size={16} />
+                          Become Seller
+                        </>
+                      )}
+                    </button>
+                  </div>
+                
+                  {error && (
+                    <div className="text-red-400 text-sm">{error}</div>
+                  )}
+
+                  {success && (
+                    <div className="text-green-400 text-sm">{success}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Tabbed Content */}
@@ -554,7 +578,7 @@ export default function UserAccount() {
               Purchases ({purchases.length})
             </button>
             
-            {sellerProfile && (
+            {sellerProfile && !isCategoryAdmin && (
               <button
                 onClick={() => setActiveTab('seller')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${

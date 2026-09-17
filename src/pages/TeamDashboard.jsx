@@ -5,7 +5,7 @@ import {
   Tag, FileText, Image as ImageIcon, AlertCircle, Save, X, Menu, Home, BarChart3,
   TrendingUp, Zap, RefreshCw, Copy, Sun, Moon, Settings, HelpCircle,
   Layers, PenTool, CloudUpload, Loader2, Star, Trash2, AlertTriangle,
-  Download, Upload
+  Download, Upload, DollarSign, ShoppingBag, CheckCircle2, ExternalLink, CreditCard, Smartphone
 } from 'lucide-react'
 import SEO from '../components/SEO'
 import { usePublicAuth } from '../context/PublicAuthContext'
@@ -14,22 +14,38 @@ import { uploadImageToGitHub } from '../services/githubUpload'
 import { extractVariables } from '../utils/variableParser'
 import { exportPromptsToExcel } from '../utils/excelUtils'
 import ExcelImportModal from '../components/ExcelImportModal'
+import { getSellerProfile, createSellerProfile, getSellerEarnings, getSellerPrompts, createPaidPrompt } from '../services/sellerService'
+import { formatCurrency } from '../services/paymentService'
+import { getSubcategories } from '../services/promptService'
 
 export default function TeamDashboard() {
   const { user, profile, isCategoryAdmin, assignedCategoryId, assignedCategoryName, signOut, loading } = usePublicAuth()
   const navigate = useNavigate()
   
-  const [activeTab, setActiveTab] = useState('prompts') // 'prompts' | 'analytics' | 'profile'
+  const [activeTab, setActiveTab] = useState('prompts') // 'prompts' | 'analytics' | 'seller' | 'profile'
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [prompts, setPrompts] = useState([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingPrompt, setEditingPrompt] = useState(null)
   const [categories, setCategories] = useState([])
   const [subcategoriesList, setSubcategoriesList] = useState([])
+
+  // Seller state
+  const [sellerProfile, setSellerProfile] = useState(null)
+  const [sellerEarnings, setSellerEarnings] = useState(null)
+  const [sellerPrompts, setSellerPrompts] = useState([])
+  const [showCreatePaidPromptModal, setShowCreatePaidPromptModal] = useState(false)
+  const [paidSubcategoriesList, setPaidSubcategoriesList] = useState([])
+  const [sellerLoading, setSellerLoading] = useState({ main: false, earnings: false, prompts: false, becomingSeller: false, submitting: false })
+  const [paidPromptForm, setPaidPromptForm] = useState({
+    title: '', slug: '', categoryId: '', subcategoryId: '', price: '',
+    description: '', prompt: '', tags: '', featuredImage: ''
+  })
+
   const [formData, setFormData] = useState({
     title: '',
     slug: '',
-    categoryId: assignedCategoryId || '', // Team member locked to assigned category
+    categoryId: assignedCategoryId || '',
     subcategoryId: '',
     tags: '',
     description: '',
@@ -42,7 +58,7 @@ export default function TeamDashboard() {
     featured: false,
     popular: false,
     trending: false,
-    status: 'pending_review', // Team members always submit for review
+    status: 'pending_review',
     rejectionReason: '',
     contentType: 'prompt',
     videoUrl: '',
@@ -379,6 +395,107 @@ export default function TeamDashboard() {
       setIsLoading(prev => ({ ...prev, prompts: false }))
     }
   }
+
+  // ── SELLER FUNCTIONS ────────────────────────────────────────────────────────
+
+  const loadSellerData = async () => {
+    if (!user) return
+    setSellerLoading(prev => ({ ...prev, main: true }))
+    try {
+      const sp = await getSellerProfile(user.id).catch(() => null)
+      setSellerProfile(sp)
+      if (sp) {
+        const [earnings, myPrompts] = await Promise.all([
+          getSellerEarnings(user.id).catch(() => null),
+          getSellerPrompts(user.id).catch(() => [])
+        ])
+        setSellerEarnings(earnings)
+        setSellerPrompts(myPrompts || [])
+      }
+    } catch (err) {
+      console.warn('Error loading seller data:', err)
+    } finally {
+      setSellerLoading(prev => ({ ...prev, main: false }))
+    }
+  }
+
+  const handleBecomeSeller = async () => {
+    setSellerLoading(prev => ({ ...prev, becomingSeller: true }))
+    try {
+      const sp = await createSellerProfile(user.id)
+      setSellerProfile(sp)
+      setSuccess('🎉 You are now a Seller! Start creating paid prompts from the Seller tab.')
+    } catch (err) {
+      setError('Failed to register as a seller. Please try again.')
+      console.error(err)
+    } finally {
+      setSellerLoading(prev => ({ ...prev, becomingSeller: false }))
+    }
+  }
+
+  const handlePaidCategoryChange = async (categoryId) => {
+    setPaidPromptForm(prev => ({ ...prev, categoryId, subcategoryId: '' }))
+    if (!categoryId) { setPaidSubcategoriesList([]); return }
+    try {
+      const subs = await getSubcategories(categoryId)
+      setPaidSubcategoriesList(subs || [])
+    } catch { setPaidSubcategoriesList([]) }
+  }
+
+  const handleSubmitPaidPrompt = async (e) => {
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+    const priceNum = Number(paidPromptForm.price)
+    if (!paidPromptForm.title.trim()) { setError('Title is required.'); return }
+    if (!paidPromptForm.categoryId) { setError('Please select a category.'); return }
+    if (isNaN(priceNum) || priceNum <= 0) { setError('Please enter a valid price in PKR.'); return }
+    if (!paidPromptForm.prompt.trim()) { setError('Prompt content is required.'); return }
+
+    setSellerLoading(prev => ({ ...prev, submitting: true }))
+    try {
+      const base = (paidPromptForm.slug.trim() || paidPromptForm.title.trim())
+        .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+      const slug = `${base}-${Math.random().toString(36).substring(2, 6)}`
+      const parsedVars = extractVariables(paidPromptForm.prompt)
+      const parsedTags = paidPromptForm.tags
+        ? paidPromptForm.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean) : []
+
+      await createPaidPrompt({
+        title: paidPromptForm.title.trim(),
+        slug,
+        category_id: paidPromptForm.categoryId,
+        subcategory_id: paidPromptForm.subcategoryId || null,
+        description: paidPromptForm.description.trim() || paidPromptForm.title.trim(),
+        prompt: paidPromptForm.prompt.trim(),
+        price: priceNum,
+        seller_id: user.id,
+        variables: parsedVars,
+        tags: parsedTags,
+        featured_image: paidPromptForm.featuredImage.trim() || null,
+        author: user.email?.split('@')[0] || 'Seller'
+      })
+
+      setSuccess('🎉 Paid prompt submitted for admin review! It will appear on the Marketplace once approved.')
+      setShowCreatePaidPromptModal(false)
+      setPaidPromptForm({ title: '', slug: '', categoryId: '', subcategoryId: '', price: '', description: '', prompt: '', tags: '', featuredImage: '' })
+      const myPrompts = await getSellerPrompts(user.id).catch(() => [])
+      setSellerPrompts(myPrompts || [])
+    } catch (err) {
+      setError(err.message || 'Failed to submit paid prompt. Please try again.')
+    } finally {
+      setSellerLoading(prev => ({ ...prev, submitting: false }))
+    }
+  }
+
+  // Load seller data when switching to the seller tab
+  useEffect(() => {
+    if (activeTab === 'seller' && user) {
+      loadSellerData()
+    }
+  }, [activeTab, user])
+
+  // ── END SELLER FUNCTIONS ───────────────────────────────────────────────────
 
   const handleAddPrompt = async (e) => {
     e.preventDefault()
@@ -813,6 +930,26 @@ export default function TeamDashboard() {
             >
               <BarChart3 size={16} />
               <span className="font-medium">Analytics</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('seller')
+                setSidebarOpen(false)
+              }}
+              className={`nav-item ${
+                activeTab === 'seller'
+                  ? 'active border-l-2 border-l-violet bg-violet/10 text-violet-soft'
+                  : 'text-ink-muted hover:text-ink hover:bg-white/[0.04]'
+              }`}
+            >
+              <DollarSign size={16} />
+              <span className="font-medium">Seller</span>
+              {sellerProfile && (
+                <span className="ml-auto chip !border-green-500/30 !bg-green-500/10 !text-green-400 !py-0.5 !text-[9px] !px-1.5">
+                  Active
+                </span>
+              )}
             </button>
 
             <button
@@ -1611,8 +1748,368 @@ export default function TeamDashboard() {
               </div>
             </div>
           )}
+
+          {/* Seller Tab */}
+          {activeTab === 'seller' && (
+            <div className="space-y-6">
+              {sellerLoading.main ? (
+                <div className="glass-card p-6 flex items-center justify-center gap-2 text-ink-muted py-12">
+                  <Loader2 size={20} className="animate-spin text-violet-soft" />
+                  <span>Loading seller data...</span>
+                </div>
+              ) : !sellerProfile ? (
+                <div className="glass-card p-8 text-center max-w-xl mx-auto space-y-4">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet/20 to-cyan/20 border border-violet/30 flex items-center justify-center mx-auto text-violet-soft">
+                    <DollarSign size={32} />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-xl text-ink">Become a Marketplace Seller</h3>
+                    <p className="text-sm text-ink-muted mt-2 leading-relaxed">
+                      As a Team Member, you can sell premium prompts directly on the PromptVault Marketplace. Set your price in PKR, accept Card (Stripe) and mobile wallet payments (JazzCash & Easypaisa), and earn from your creations.
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      onClick={handleBecomeSeller}
+                      disabled={sellerLoading.becomingSeller}
+                      className="btn-primary !py-2.5 !px-6 text-sm inline-flex items-center gap-2 shadow-glow"
+                    >
+                      {sellerLoading.becomingSeller ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Activating...
+                        </>
+                      ) : (
+                        <>
+                          <DollarSign size={16} />
+                          Activate Seller Account
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Earnings Overview */}
+                  <div className="glass-card p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h3 className="font-display text-lg sm:text-xl font-semibold text-ink">Seller Earnings</h3>
+                        <p className="text-xs text-ink-muted">Track your marketplace earnings across payment methods</p>
+                      </div>
+                      <span className="chip !border-green-500/30 !bg-green-500/10 !text-green-400 text-xs flex items-center gap-1.5">
+                        <CheckCircle2 size={13} /> Seller Active
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-violet/20 to-cyan/20 border border-violet/30 text-center">
+                        <div className="text-2xl font-bold text-ink">
+                          {formatCurrency(sellerEarnings?.total_earnings || 0)}
+                        </div>
+                        <div className="text-xs text-ink-muted mt-1">Total Earnings</div>
+                      </div>
+                      <div className="p-4 rounded-xl bg-white/[0.03] border border-line text-center">
+                        <div className="text-2xl font-bold text-ink">
+                          {sellerEarnings?.total_sales || 0}
+                        </div>
+                        <div className="text-xs text-ink-muted mt-1">Total Sales</div>
+                      </div>
+                      <div className="p-4 rounded-xl bg-white/[0.03] border border-line text-center">
+                        <div className="text-2xl font-bold text-ink">
+                          {formatCurrency(sellerEarnings?.stripe_earnings || 0, 'USD')}
+                        </div>
+                        <div className="text-xs text-ink-muted mt-1">Stripe Earnings</div>
+                      </div>
+                      <div className="p-4 rounded-xl bg-white/[0.03] border border-line text-center">
+                        <div className="text-2xl font-bold text-ink">
+                          {formatCurrency((sellerEarnings?.jazzcash_earnings || 0) + (sellerEarnings?.easypaisa_earnings || 0))}
+                        </div>
+                        <div className="text-xs text-ink-muted mt-1">Local (JazzCash/Easypaisa)</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 p-3.5 rounded-xl bg-amber/10 border border-amber/30 text-xs text-amber-200">
+                      <strong>Note:</strong> Payouts are processed manually by the admin team. Contact support to request disbursement.
+                    </div>
+                  </div>
+
+                  {/* My Paid Listings */}
+                  <div className="glass-card p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h3 className="font-display text-lg font-semibold text-ink">My Paid Listings</h3>
+                        <p className="text-xs text-ink-muted">Monetized prompts submitted to the marketplace</p>
+                      </div>
+                      <button
+                        onClick={() => setShowCreatePaidPromptModal(true)}
+                        className="btn-primary flex items-center gap-1.5 !py-2 !px-4 text-xs"
+                      >
+                        <Plus size={15} />
+                        Create Paid Prompt
+                      </button>
+                    </div>
+
+                    {sellerPrompts.length === 0 ? (
+                      <div className="text-center py-10 border border-line/60 border-dashed rounded-xl p-6">
+                        <ShoppingBag size={32} className="mx-auto text-ink-faint mb-2" />
+                        <h4 className="font-display font-medium text-ink text-sm mb-1">No paid listings yet</h4>
+                        <p className="text-xs text-ink-muted mb-4 max-w-sm mx-auto">
+                          Create your first premium prompt to monetize your expertise on PromptVault.
+                        </p>
+                        <button
+                          onClick={() => setShowCreatePaidPromptModal(true)}
+                          className="btn-primary !py-2 !px-4 text-xs inline-flex items-center gap-1.5"
+                        >
+                          <Plus size={14} /> Create Paid Listing
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {sellerPrompts.map((p) => (
+                          <div
+                            key={p.id}
+                            className="p-4 rounded-xl bg-white/[0.02] border border-line flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors hover:border-line/80"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-ink text-sm sm:text-base">{p.title}</span>
+                                {p.categories?.name && (
+                                  <span className="chip !py-0.5 !text-[10px]">{p.categories.name}</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-ink-muted line-clamp-1">{p.description}</p>
+                              <div className="flex items-center gap-3 text-[11px] text-ink-faint font-mono">
+                                <span>{p.purchase_count || 0} purchases</span>
+                                <span>•</span>
+                                <span>Submitted {new Date(p.created_at).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                              <div className="text-right">
+                                <div className="font-bold text-cyan text-sm">{formatCurrency(p.price)}</div>
+                              </div>
+
+                              {p.sale_status === 'approved' && (
+                                <span className="chip !border-green-500/40 !bg-green-500/15 !text-green-400 text-xs flex items-center gap-1">
+                                  <CheckCircle2 size={12} /> Live
+                                </span>
+                              )}
+                              {p.sale_status === 'pending_approval' && (
+                                <span className="chip !border-amber/40 !bg-amber/15 !text-amber text-xs flex items-center gap-1">
+                                  <AlertCircle size={12} /> In Review
+                                </span>
+                              )}
+                              {p.sale_status === 'rejected' && (
+                                <span className="chip !border-red-500/40 !bg-red-500/15 !text-red-400 text-xs flex items-center gap-1">
+                                  <AlertCircle size={12} /> Rejected
+                                </span>
+                              )}
+
+                              {p.sale_status === 'approved' && (
+                                <Link
+                                  to={`/prompt/${p.slug}`}
+                                  target="_blank"
+                                  className="btn-ghost !p-2 text-ink-muted hover:text-ink"
+                                  title="View live prompt"
+                                >
+                                  <ExternalLink size={14} />
+                                </Link>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
+
+      {/* Create Paid Prompt Modal */}
+      {showCreatePaidPromptModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-2xl bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden my-8 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-line">
+              <div>
+                <h3 className="font-display font-semibold text-ink text-base sm:text-lg flex items-center gap-2">
+                  <DollarSign size={20} className="text-violet-soft" />
+                  Create Paid Listing
+                </h3>
+                <p className="text-xs text-ink-muted">Set price in PKR and submit for super admin marketplace review</p>
+              </div>
+              <button
+                onClick={() => setShowCreatePaidPromptModal(false)}
+                className="p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-white/5 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitPaidPrompt} className="p-6 space-y-4 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-ink mb-1">
+                    Prompt Title <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={paidPromptForm.title}
+                    onChange={(e) => setPaidPromptForm(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="e.g. Master High-Converting Facebook Ads"
+                    className="w-full rounded-xl border border-line bg-white/[0.03] px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint outline-none focus:border-violet"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ink mb-1">
+                    Price (PKR) <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    required
+                    value={paidPromptForm.price}
+                    onChange={(e) => setPaidPromptForm(prev => ({ ...prev, price: e.target.value }))}
+                    placeholder="e.g. 1500"
+                    className="w-full rounded-xl border border-line bg-white/[0.03] px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint outline-none focus:border-violet"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-ink mb-1">
+                    Category <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    required
+                    value={paidPromptForm.categoryId}
+                    onChange={(e) => handlePaidCategoryChange(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none focus:border-violet"
+                  >
+                    <option value="">Select a category</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ink mb-1">
+                    Subcategory (Optional)
+                  </label>
+                  <select
+                    value={paidPromptForm.subcategoryId}
+                    onChange={(e) => setPaidPromptForm(prev => ({ ...prev, subcategoryId: e.target.value }))}
+                    disabled={!paidPromptForm.categoryId || paidSubcategoriesList.length === 0}
+                    className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none focus:border-violet disabled:opacity-50"
+                  >
+                    <option value="">None / General</option>
+                    {paidSubcategoriesList.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-ink mb-1">
+                  Short Description
+                </label>
+                <textarea
+                  rows={2}
+                  value={paidPromptForm.description}
+                  onChange={(e) => setPaidPromptForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Briefly explain what this prompt delivers..."
+                  className="w-full rounded-xl border border-line bg-white/[0.03] px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint outline-none focus:border-violet"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-ink">
+                    Prompt Content <span className="text-red-400">*</span>
+                  </label>
+                  <span className="text-[10px] text-violet-soft font-mono">
+                    Use {`{{Variable}}`} for placeholders
+                  </span>
+                </div>
+                <textarea
+                  rows={5}
+                  required
+                  value={paidPromptForm.prompt}
+                  onChange={(e) => setPaidPromptForm(prev => ({ ...prev, prompt: e.target.value }))}
+                  placeholder="Write prompt text here. Content will be protected behind the paywall until purchased..."
+                  className="w-full rounded-xl border border-line bg-white/[0.03] px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint font-mono outline-none focus:border-violet"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-ink mb-1">
+                    Tags (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={paidPromptForm.tags}
+                    onChange={(e) => setPaidPromptForm(prev => ({ ...prev, tags: e.target.value }))}
+                    placeholder="marketing, seo, copy"
+                    className="w-full rounded-xl border border-line bg-white/[0.03] px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint outline-none focus:border-violet"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ink mb-1">
+                    Featured Image URL (optional)
+                  </label>
+                  <input
+                    type="url"
+                    value={paidPromptForm.featuredImage}
+                    onChange={(e) => setPaidPromptForm(prev => ({ ...prev, featuredImage: e.target.value }))}
+                    placeholder="https://..."
+                    className="w-full rounded-xl border border-line bg-white/[0.03] px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint outline-none focus:border-violet"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePaidPromptModal(false)}
+                  className="btn-ghost !py-2.5 !px-5 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sellerLoading.submitting}
+                  className="btn-primary !py-2.5 !px-6 text-xs flex items-center gap-2"
+                >
+                  {sellerLoading.submitting ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={14} />
+                      Submit for Approval
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Excel Import Modal */}
       <ExcelImportModal
