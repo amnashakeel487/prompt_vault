@@ -14,8 +14,8 @@ import { uploadImageToGitHub } from '../services/githubUpload'
 import { extractVariables } from '../utils/variableParser'
 import { exportPromptsToExcel } from '../utils/excelUtils'
 import ExcelImportModal from '../components/ExcelImportModal'
-import { getSellerProfile, createSellerProfile, getSellerEarnings, getSellerPrompts, createPaidPrompt } from '../services/sellerService'
-import { formatCurrency } from '../services/paymentService'
+import { getSellerProfile, createSellerProfile, updateSellerProfile, getSellerEarnings, getSellerPrompts, createPaidPrompt } from '../services/sellerService'
+import { formatCurrency, getSellerOrders, approveManualOrder, rejectManualOrder } from '../services/paymentService'
 import { getSubcategories } from '../services/promptService'
 
 export default function TeamDashboard() {
@@ -34,6 +34,21 @@ export default function TeamDashboard() {
   const [sellerProfile, setSellerProfile] = useState(null)
   const [sellerEarnings, setSellerEarnings] = useState(null)
   const [sellerPrompts, setSellerPrompts] = useState([])
+  const [sellerOrders, setSellerOrders] = useState([])
+  const [orderFilter, setOrderFilter] = useState('pending') // 'pending' | 'completed' | 'all'
+  const [savingPayout, setSavingPayout] = useState(false)
+  const [payoutForm, setPayoutForm] = useState({
+    jazzcash_title: '',
+    jazzcash_number: '',
+    easypaisa_title: '',
+    easypaisa_number: '',
+    payment_instructions: ''
+  })
+  const [viewingScreenshot, setViewingScreenshot] = useState(null)
+  const [rejectingOrderId, setRejectingOrderId] = useState(null)
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [orderActionLoading, setOrderActionLoading] = useState({})
+
   const [showCreatePaidPromptModal, setShowCreatePaidPromptModal] = useState(false)
   const [paidSubcategoriesList, setPaidSubcategoriesList] = useState([])
   const [sellerLoading, setSellerLoading] = useState({ main: false, earnings: false, prompts: false, becomingSeller: false, submitting: false })
@@ -405,17 +420,86 @@ export default function TeamDashboard() {
       const sp = await getSellerProfile(user.id).catch(() => null)
       setSellerProfile(sp)
       if (sp) {
-        const [earnings, myPrompts] = await Promise.all([
+        if (sp.payout_details) {
+          setPayoutForm({
+            jazzcash_title: sp.payout_details.jazzcash_title || '',
+            jazzcash_number: sp.payout_details.jazzcash_number || '',
+            easypaisa_title: sp.payout_details.easypaisa_title || '',
+            easypaisa_number: sp.payout_details.easypaisa_number || '',
+            payment_instructions: sp.payout_details.payment_instructions || ''
+          })
+        }
+
+        const [earnings, myPrompts, orders] = await Promise.all([
           getSellerEarnings(user.id).catch(() => null),
-          getSellerPrompts(user.id).catch(() => [])
+          getSellerPrompts(user.id).catch(() => []),
+          getSellerOrders().catch(() => [])
         ])
         setSellerEarnings(earnings)
         setSellerPrompts(myPrompts || [])
+        setSellerOrders(orders || [])
       }
     } catch (err) {
       console.warn('Error loading seller data:', err)
     } finally {
       setSellerLoading(prev => ({ ...prev, main: false }))
+    }
+  }
+
+  const handleSavePayoutDetails = async (e) => {
+    e?.preventDefault()
+    setSavingPayout(true)
+    setError('')
+    setSuccess('')
+    try {
+      const updated = await updateSellerProfile(user.id, {
+        payout_details: payoutForm
+      })
+      setSellerProfile(updated)
+      setSuccess('✅ Payment credentials saved! Buyers will see these details when purchasing your prompts.')
+      setTimeout(() => setSuccess(''), 4000)
+    } catch (err) {
+      console.error('Error saving payout details:', err)
+      setError(err.message || 'Failed to save payment credentials.')
+    } finally {
+      setSavingPayout(false)
+    }
+  }
+
+  const handleApproveOrder = async (purchaseId) => {
+    setOrderActionLoading(prev => ({ ...prev, [purchaseId]: 'approving' }))
+    setError('')
+    setSuccess('')
+    try {
+      await approveManualOrder(purchaseId)
+      setSuccess('🎉 Payment approved! The buyer has now been granted full access to the prompt.')
+      setTimeout(() => setSuccess(''), 4000)
+      await loadSellerData()
+    } catch (err) {
+      console.error('Error approving order:', err)
+      setError(err.message || 'Failed to approve payment.')
+    } finally {
+      setOrderActionLoading(prev => ({ ...prev, [purchaseId]: null }))
+    }
+  }
+
+  const handleRejectOrder = async () => {
+    if (!rejectingOrderId) return
+    setOrderActionLoading(prev => ({ ...prev, [rejectingOrderId]: 'rejecting' }))
+    setError('')
+    setSuccess('')
+    try {
+      await rejectManualOrder(rejectingOrderId, rejectionReason.trim())
+      setSuccess('Order marked as rejected.')
+      setRejectingOrderId(null)
+      setRejectionReason('')
+      setTimeout(() => setSuccess(''), 4000)
+      await loadSellerData()
+    } catch (err) {
+      console.error('Error rejecting order:', err)
+      setError(err.message || 'Failed to reject order.')
+    } finally {
+      setOrderActionLoading(prev => ({ ...prev, [rejectingOrderId]: null }))
     }
   }
 
@@ -1945,6 +2029,365 @@ export default function TeamDashboard() {
                       </div>
                     )}
                   </div>
+
+                  {/* Payment Receiving Accounts (JazzCash & Easypaisa) */}
+                  <div className="glass-card p-6">
+                    <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                      <div>
+                        <h3 className="font-display text-lg font-semibold text-ink flex items-center gap-2">
+                          <Smartphone size={18} className="text-violet-soft" />
+                          Payment Receiving Accounts
+                        </h3>
+                        <p className="text-xs text-ink-muted mt-0.5">
+                          Configure your JazzCash and Easypaisa details. Buyers will send money to these accounts and upload receipts.
+                        </p>
+                      </div>
+
+                      {payoutForm.jazzcash_number && payoutForm.easypaisa_number ? (
+                        <span className="chip !border-green-500/40 !bg-green-500/15 !text-green-400 text-xs flex items-center gap-1">
+                          <CheckCircle2 size={12} /> Wallets Active
+                        </span>
+                      ) : (
+                        <span className="chip !border-amber/40 !bg-amber/15 !text-amber text-xs flex items-center gap-1">
+                          <AlertCircle size={12} /> Configuration Incomplete
+                        </span>
+                      )}
+                    </div>
+
+                    <form onSubmit={handleSavePayoutDetails} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* JazzCash Box */}
+                        <div className="p-4 rounded-xl bg-white/[0.02] border border-line space-y-3">
+                          <div className="flex items-center gap-2 font-medium text-ink text-sm">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                            JazzCash Mobile Wallet
+                          </div>
+
+                          <div>
+                            <label className="block text-xs text-ink-muted mb-1">
+                              Account Title (Name on Account)
+                            </label>
+                            <input
+                              type="text"
+                              value={payoutForm.jazzcash_title}
+                              onChange={(e) => setPayoutForm(prev => ({ ...prev, jazzcash_title: e.target.value }))}
+                              placeholder="e.g. Muhammad Ali"
+                              className="input w-full text-xs"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs text-ink-muted mb-1">
+                              JazzCash Mobile / Account Number
+                            </label>
+                            <input
+                              type="text"
+                              value={payoutForm.jazzcash_number}
+                              onChange={(e) => setPayoutForm(prev => ({ ...prev, jazzcash_number: e.target.value }))}
+                              placeholder="e.g. 03001234567"
+                              className="input w-full text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Easypaisa Box */}
+                        <div className="p-4 rounded-xl bg-white/[0.02] border border-line space-y-3">
+                          <div className="flex items-center gap-2 font-medium text-ink text-sm">
+                            <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                            Easypaisa Mobile Wallet
+                          </div>
+
+                          <div>
+                            <label className="block text-xs text-ink-muted mb-1">
+                              Account Title (Name on Account)
+                            </label>
+                            <input
+                              type="text"
+                              value={payoutForm.easypaisa_title}
+                              onChange={(e) => setPayoutForm(prev => ({ ...prev, easypaisa_title: e.target.value }))}
+                              placeholder="e.g. Muhammad Ali"
+                              className="input w-full text-xs"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs text-ink-muted mb-1">
+                              Easypaisa Mobile / Account Number
+                            </label>
+                            <input
+                              type="text"
+                              value={payoutForm.easypaisa_number}
+                              onChange={(e) => setPayoutForm(prev => ({ ...prev, easypaisa_number: e.target.value }))}
+                              placeholder="e.g. 03451234567"
+                              className="input w-full text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Payment Instructions */}
+                      <div>
+                        <label className="block text-xs text-ink-muted mb-1">
+                          Special Instructions for Buyers (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={payoutForm.payment_instructions}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, payment_instructions: e.target.value }))}
+                          placeholder="e.g. Please include the prompt title in reference and upload clear screenshot."
+                          className="input w-full text-xs"
+                        />
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={savingPayout}
+                          className="btn-primary flex items-center gap-2 !py-2 !px-5 text-xs font-medium"
+                        >
+                          {savingPayout ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save size={14} />
+                              Save Payment Accounts
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Buyer Payment Verifications & Orders */}
+                  <div className="glass-card p-6">
+                    <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                      <div>
+                        <h3 className="font-display text-lg font-semibold text-ink flex items-center gap-2">
+                          <ShoppingBag size={18} className="text-violet-soft" />
+                          Buyer Payment Verifications & Orders
+                        </h3>
+                        <p className="text-xs text-ink-muted mt-0.5">
+                          Verify buyer transfer receipts, approve payments to unlock prompt access, or reject invalid proofs.
+                        </p>
+                      </div>
+
+                      {/* Filter Tabs */}
+                      <div className="flex items-center gap-1.5 p-1 bg-white/[0.03] border border-line rounded-xl text-xs">
+                        <button
+                          onClick={() => setOrderFilter('pending')}
+                          className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
+                            orderFilter === 'pending'
+                              ? 'bg-amber/20 text-amber border border-amber/30'
+                              : 'text-ink-muted hover:text-ink'
+                          }`}
+                        >
+                          <Clock size={12} />
+                          Pending Review ({sellerOrders.filter(o => o.status === 'pending').length})
+                        </button>
+                        <button
+                          onClick={() => setOrderFilter('completed')}
+                          className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
+                            orderFilter === 'completed'
+                              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                              : 'text-ink-muted hover:text-ink'
+                          }`}
+                        >
+                          <CheckCircle2 size={12} />
+                          Approved ({sellerOrders.filter(o => o.status === 'completed').length})
+                        </button>
+                        <button
+                          onClick={() => setOrderFilter('all')}
+                          className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                            orderFilter === 'all'
+                              ? 'bg-violet/20 text-violet-soft border border-violet/30'
+                              : 'text-ink-muted hover:text-ink'
+                          }`}
+                        >
+                          All ({sellerOrders.length})
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Orders List */}
+                    {(() => {
+                      const filteredOrders = sellerOrders.filter(o => {
+                        if (orderFilter === 'pending') return o.status === 'pending'
+                        if (orderFilter === 'completed') return o.status === 'completed'
+                        return true
+                      })
+
+                      if (filteredOrders.length === 0) {
+                        return (
+                          <div className="text-center py-10 border border-line/60 border-dashed rounded-xl p-6">
+                            <Clock size={28} className="mx-auto text-ink-faint mb-2" />
+                            <h4 className="font-display font-medium text-ink text-sm mb-1">
+                              {orderFilter === 'pending' ? 'No pending payment verifications' : 'No orders found'}
+                            </h4>
+                            <p className="text-xs text-ink-muted max-w-sm mx-auto">
+                              {orderFilter === 'pending'
+                                ? 'When buyers transfer money for your paid prompts, their receipts and Transaction IDs will appear here for verification.'
+                                : 'All past orders and approved transactions will appear in this log.'}
+                            </p>
+                          </div>
+                        )
+                      }
+
+                      return (
+                        <div className="space-y-3">
+                          {filteredOrders.map((order) => {
+                            const screenshotUrl = order.gateway_response?.screenshot_url
+                            const senderPhone = order.gateway_response?.sender_number
+                            const buyerEmail = order.gateway_response?.buyer_email || 'Buyer'
+                            const isApproving = orderActionLoading[order.id] === 'approving'
+                            const isRejecting = orderActionLoading[order.id] === 'rejecting'
+
+                            return (
+                              <div
+                                key={order.id}
+                                className="p-4 rounded-xl bg-white/[0.02] border border-line flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors hover:border-line/80"
+                              >
+                                {/* Order Details */}
+                                <div className="space-y-1.5 flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-semibold text-ink text-sm">
+                                      {order.prompts?.title || 'Paid Prompt'}
+                                    </span>
+                                    <span className={`chip !py-0.5 !px-2 !text-[11px] font-mono ${
+                                      order.payment_method === 'jazzcash'
+                                        ? '!border-red-500/30 !bg-red-500/10 !text-red-400'
+                                        : order.payment_method === 'easypaisa'
+                                        ? '!border-green-500/30 !bg-green-500/10 !text-green-400'
+                                        : '!border-violet/30 !bg-violet/10 !text-violet-soft'
+                                    }`}>
+                                      {order.payment_method?.toUpperCase()}
+                                    </span>
+
+                                    {order.status === 'pending' && (
+                                      <span className="chip !border-amber/40 !bg-amber/15 !text-amber text-[11px] flex items-center gap-1">
+                                        <Clock size={11} /> Pending Review
+                                      </span>
+                                    )}
+                                    {order.status === 'completed' && (
+                                      <span className="chip !border-green-500/40 !bg-green-500/15 !text-green-400 text-[11px] flex items-center gap-1">
+                                        <CheckCircle2 size={11} /> Approved
+                                      </span>
+                                    )}
+                                    {order.status === 'failed' && (
+                                      <span className="chip !border-red-500/40 !bg-red-500/15 !text-red-400 text-[11px] flex items-center gap-1">
+                                        <XCircle size={11} /> Rejected
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-ink-muted pt-1">
+                                    <div>
+                                      <span className="text-ink-faint">Buyer: </span>
+                                      <span className="font-medium text-ink">{buyerEmail}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-ink-faint">TID: </span>
+                                      <span className="font-mono font-bold text-violet-soft select-all">
+                                        {order.gateway_transaction_id || 'N/A'}
+                                      </span>
+                                    </div>
+                                    {senderPhone && (
+                                      <div>
+                                        <span className="text-ink-faint">Sender: </span>
+                                        <span className="font-mono text-ink">{senderPhone}</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="text-[11px] text-ink-faint">
+                                    Submitted {new Date(order.created_at).toLocaleString()}
+                                    {order.gateway_response?.rejection_reason && (
+                                      <span className="text-red-400 ml-2">
+                                        • Reason: {order.gateway_response.rejection_reason}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Amount & Screenshot & Actions */}
+                                <div className="flex items-center gap-3 shrink-0 self-end md:self-center flex-wrap sm:flex-nowrap">
+                                  <div className="text-right mr-1">
+                                    <div className="font-bold text-cyan text-base">
+                                      {formatCurrency(order.amount)}
+                                    </div>
+                                  </div>
+
+                                  {/* Screenshot Thumbnail Button */}
+                                  {screenshotUrl && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewingScreenshot(screenshotUrl)}
+                                      className="relative group p-1 rounded-lg border border-line hover:border-violet/60 bg-surface transition-all shrink-0"
+                                      title="View payment receipt screenshot"
+                                    >
+                                      <img
+                                        src={screenshotUrl}
+                                        alt="Receipt"
+                                        className="w-12 h-12 object-cover rounded"
+                                      />
+                                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded flex items-center justify-center text-white transition-opacity">
+                                        <Eye size={14} />
+                                      </div>
+                                    </button>
+                                  )}
+
+                                  {/* Approval / Rejection buttons for Pending */}
+                                  {order.status === 'pending' ? (
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => handleApproveOrder(order.id)}
+                                        disabled={isApproving || isRejecting}
+                                        className="btn-primary !py-2 !px-3.5 text-xs flex items-center gap-1.5 shadow-sm !bg-green-600 hover:!bg-green-500 text-white"
+                                        title="Approve payment and unlock prompt for buyer"
+                                      >
+                                        {isApproving ? (
+                                          <Loader2 size={13} className="animate-spin" />
+                                        ) : (
+                                          <CheckCircle2 size={13} />
+                                        )}
+                                        <span>Approve</span>
+                                      </button>
+
+                                      <button
+                                        onClick={() => {
+                                          setRejectingOrderId(order.id)
+                                          setRejectionReason('')
+                                        }}
+                                        disabled={isApproving || isRejecting}
+                                        className="btn-ghost !py-2 !px-3 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20"
+                                        title="Reject payment"
+                                      >
+                                        <X size={13} />
+                                        <span>Reject</span>
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    order.prompts?.slug && (
+                                      <Link
+                                        to={`/prompt/${order.prompts.slug}`}
+                                        target="_blank"
+                                        className="btn-ghost !p-2 text-ink-muted hover:text-ink"
+                                        title="View prompt"
+                                      >
+                                        <ExternalLink size={14} />
+                                      </Link>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })()}
+                  </div>
                 </div>
               )}
             </div>
@@ -2129,6 +2572,104 @@ export default function TeamDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Screenshot Viewer Modal */}
+      {viewingScreenshot && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+          onClick={() => setViewingScreenshot(null)}
+        >
+          <div 
+            className="relative max-w-2xl w-full bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 mb-3 border-b border-line">
+              <div className="text-sm font-semibold text-ink flex items-center gap-2">
+                <ImageIcon size={16} className="text-violet-soft" />
+                Payment Proof Receipt
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={viewingScreenshot}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-ghost !p-1.5 text-ink-muted hover:text-ink text-xs flex items-center gap-1"
+                >
+                  <ExternalLink size={14} /> Open Full
+                </a>
+                <button
+                  onClick={() => setViewingScreenshot(null)}
+                  className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/[0.05]"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-[75vh] overflow-auto flex items-center justify-center bg-black/40 rounded-xl p-2">
+              <img
+                src={viewingScreenshot}
+                alt="Payment Receipt"
+                className="max-h-[70vh] w-auto object-contain rounded-lg shadow"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Order Modal */}
+      {rejectingOrderId && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+          onClick={() => setRejectingOrderId(null)}
+        >
+          <div 
+            className="w-full max-w-md bg-surface border border-line rounded-2xl shadow-2xl p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-red-500/15 text-red-400">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h4 className="font-display font-semibold text-ink">Reject Payment Order</h4>
+                <p className="text-xs text-ink-muted">Specify why the payment could not be verified</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-ink mb-1.5">
+                Rejection Reason (Shown to Buyer)
+              </label>
+              <textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="e.g. Invalid Transaction ID, amount does not match, or screenshot is blurry..."
+                rows={3}
+                className="input w-full text-xs"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setRejectingOrderId(null)}
+                className="btn-ghost flex-1 text-xs py-2"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRejectOrder}
+                className="btn-primary !bg-red-600 hover:!bg-red-500 text-white flex-1 text-xs py-2 flex items-center justify-center gap-1.5"
+              >
+                <X size={14} />
+                Confirm Reject
+              </button>
+            </div>
           </div>
         </div>
       )}

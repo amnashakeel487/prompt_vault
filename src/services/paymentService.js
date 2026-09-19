@@ -57,6 +57,86 @@ export async function createEasypaisaSession(promptId, testMode = false) {
   }
 }
 
+export async function getSellerPaymentCredentials(promptId, sellerId) {
+  try {
+    // Try via edge function first
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      const data = await callFunction('manage-manual-payment', {
+        action: 'get-seller-credentials',
+        prompt_id: promptId,
+        seller_id: sellerId
+      })
+      return data?.payout_details || {}
+    }
+
+    // Fallback: direct public query if unauthenticated
+    let targetSellerId = sellerId
+    if (!targetSellerId && promptId) {
+      const { data: prompt } = await supabase
+        .from('prompts')
+        .select('seller_id')
+        .eq('id', promptId)
+        .single()
+      targetSellerId = prompt?.seller_id
+    }
+
+    if (!targetSellerId) return {}
+
+    const { data: profile } = await supabase
+      .from('seller_profiles')
+      .select('payout_details')
+      .eq('id', targetSellerId)
+      .maybeSingle()
+
+    return profile?.payout_details || {}
+  } catch (err) {
+    console.warn('Could not fetch seller credentials:', err)
+    return {}
+  }
+}
+
+export async function submitManualPaymentProof({
+  promptId,
+  paymentMethod,
+  transactionId,
+  screenshotUrl,
+  senderNumber,
+  notes
+}) {
+  return await callFunction('manage-manual-payment', {
+    action: 'submit-payment',
+    prompt_id: promptId,
+    payment_method: paymentMethod,
+    transaction_id: transactionId,
+    screenshot_url: screenshotUrl,
+    sender_number: senderNumber,
+    notes: notes
+  })
+}
+
+export async function getSellerOrders() {
+  const data = await callFunction('manage-manual-payment', {
+    action: 'get-seller-orders'
+  })
+  return data?.orders || []
+}
+
+export async function approveManualOrder(purchaseId) {
+  return await callFunction('manage-manual-payment', {
+    action: 'approve-order',
+    purchase_id: purchaseId
+  })
+}
+
+export async function rejectManualOrder(purchaseId, reason) {
+  return await callFunction('manage-manual-payment', {
+    action: 'reject-order',
+    purchase_id: purchaseId,
+    reason: reason
+  })
+}
+
 export async function redirectToPaymentGateway(paymentData, paymentMethod) {
   // Create a form and submit it programmatically for JazzCash/Easypaisa
   const form = document.createElement('form')

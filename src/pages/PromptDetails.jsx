@@ -334,6 +334,47 @@ export default function PromptDetails() {
           <div className="mt-6 sm:mt-8">
             {canAccessPrompt ? (
               <VariableForm variables={variables} onGenerate={handleGenerate} />
+            ) : purchaseStatus?.status === 'pending' ? (
+              <div className="glass-card p-6 text-center border border-amber/30 bg-amber/5">
+                <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-amber/20 border border-amber/30 text-amber">
+                  <Clock size={24} />
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber/20 border border-amber/30 text-amber text-xs font-semibold mb-2 shadow-sm">
+                  <span>Payment Verification in Progress</span>
+                </div>
+                <h3 className="font-display text-lg font-semibold text-ink mb-2">
+                  Waiting for Seller Approval
+                </h3>
+                <p className="text-xs sm:text-sm text-ink-muted mb-4 max-w-md mx-auto leading-relaxed">
+                  You submitted payment proof with Transaction ID <span className="font-mono text-violet-soft font-semibold">{purchaseStatus.gateway_transaction_id || 'N/A'}</span>. The seller is reviewing your screenshot. Once verified, this prompt will unlock automatically.
+                </p>
+                <button
+                  onClick={handleUnlockPrompt}
+                  className="btn-ghost text-xs sm:text-sm !py-2 !px-4 mx-auto inline-flex items-center gap-2"
+                >
+                  <Copy size={14} />
+                  Re-check / Re-submit Proof
+                </button>
+              </div>
+            ) : purchaseStatus?.status === 'failed' ? (
+              <div className="glass-card p-6 text-center border border-red-500/30 bg-red-500/5">
+                <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 border border-red-500/30 text-red-400">
+                  <AlertTriangle size={24} />
+                </div>
+                <h3 className="font-display text-lg font-semibold text-ink mb-1">
+                  Payment Verification Rejected
+                </h3>
+                <p className="text-xs sm:text-sm text-red-300 mb-4 max-w-md mx-auto">
+                  {purchaseStatus.gateway_response?.rejection_reason || 'The seller could not verify your previous payment transfer.'}
+                </p>
+                <button
+                  onClick={handleUnlockPrompt}
+                  className="btn-primary flex items-center gap-2 mx-auto !py-2.5 !px-6 text-xs sm:text-sm"
+                >
+                  <CreditCard size={15} />
+                  Try Again · {formatCurrency(prompt.price)}
+                </button>
+              </div>
             ) : (
               <div className="glass-card p-6 text-center border border-violet/30 bg-violet/5">
                 <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-violet/20 border border-violet/30">
@@ -364,20 +405,57 @@ export default function PromptDetails() {
               {/* Blur overlay for paid prompts */}
               {!canAccessPrompt && (
                 <div className="absolute inset-0 bg-surface/85 backdrop-blur-md z-10 flex flex-col items-center justify-center p-6 text-center">
-                  <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-violet/20 border border-violet/30 text-violet-soft text-xs font-semibold mb-2.5 shadow-sm">
-                    <Lock size={13} />
-                    <span>Content Locked Behind Paywall</span>
-                  </div>
-                  <p className="text-xs sm:text-sm text-ink-muted mb-4 max-w-sm leading-relaxed">
-                    Purchase this premium prompt to unlock the full text, fill variables interactively, and copy with one click.
-                  </p>
-                  <button
-                    onClick={handleUnlockPrompt}
-                    className="btn-primary flex items-center gap-2 !py-2.5 !px-6 text-xs sm:text-sm font-semibold shadow-glow"
-                  >
-                    <CreditCard size={15} />
-                    <span>Unlock Full Prompt · {formatCurrency(prompt.price)}</span>
-                  </button>
+                  {purchaseStatus?.status === 'pending' ? (
+                    <>
+                      <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber/20 border border-amber/30 text-amber text-xs font-semibold mb-2.5 shadow-sm">
+                        <Clock size={13} />
+                        <span>Payment Verification in Progress</span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-ink-muted mb-4 max-w-sm leading-relaxed">
+                        Transaction ID <span className="font-mono text-ink font-semibold">{purchaseStatus.gateway_transaction_id}</span> is awaiting seller approval.
+                      </p>
+                      <button
+                        onClick={handleUnlockPrompt}
+                        className="btn-ghost !py-2 !px-4 text-xs font-medium"
+                      >
+                        Check / Update Proof
+                      </button>
+                    </>
+                  ) : purchaseStatus?.status === 'failed' ? (
+                    <>
+                      <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-semibold mb-2.5 shadow-sm">
+                        <AlertTriangle size={13} />
+                        <span>Verification Rejected</span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-ink-muted mb-4 max-w-sm leading-relaxed">
+                        Please submit a valid payment receipt to unlock this prompt.
+                      </p>
+                      <button
+                        onClick={handleUnlockPrompt}
+                        className="btn-primary flex items-center gap-2 !py-2.5 !px-6 text-xs sm:text-sm font-semibold shadow-glow"
+                      >
+                        <CreditCard size={15} />
+                        <span>Re-submit Payment · {formatCurrency(prompt.price)}</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-violet/20 border border-violet/30 text-violet-soft text-xs font-semibold mb-2.5 shadow-sm">
+                        <Lock size={13} />
+                        <span>Content Locked Behind Paywall</span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-ink-muted mb-4 max-w-sm leading-relaxed">
+                        Purchase this premium prompt to unlock the full text, fill variables interactively, and copy with one click.
+                      </p>
+                      <button
+                        onClick={handleUnlockPrompt}
+                        className="btn-primary flex items-center gap-2 !py-2.5 !px-6 text-xs sm:text-sm font-semibold shadow-glow"
+                      >
+                        <CreditCard size={15} />
+                        <span>Unlock Full Prompt · {formatCurrency(prompt.price)}</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
               
@@ -477,6 +555,21 @@ export default function PromptDetails() {
                     <Loader2 size={16} className="animate-spin" />
                     <span>Checking purchase...</span>
                   </div>
+                ) : purchaseStatus?.status === 'pending' ? (
+                  <div className="p-3 rounded-xl bg-amber/10 border border-amber/30 text-amber text-xs space-y-1">
+                    <div className="font-semibold flex items-center gap-1.5">
+                      <Clock size={14} /> Verification Pending
+                    </div>
+                    <p className="text-amber-200/80 text-[11px] leading-relaxed">
+                      TID: <span className="font-mono font-medium text-ink">{purchaseStatus.gateway_transaction_id}</span>. Waiting for seller review.
+                    </p>
+                    <button
+                      onClick={handleUnlockPrompt}
+                      className="mt-1.5 text-xs text-violet-soft hover:underline block"
+                    >
+                      Update / Re-submit Proof →
+                    </button>
+                  </div>
                 ) : (
                   <button
                     onClick={handleUnlockPrompt}
@@ -538,9 +631,12 @@ export default function PromptDetails() {
         onClose={() => setShowPaymentModal(false)}
         prompt={prompt}
         onPaymentSuccess={() => {
-          setShowPaymentModal(false)
-          setToast('Payment successful! Reloading prompt...')
-          setTimeout(() => window.location.reload(), 1000)
+          if (user?.id && prompt?.id) {
+            checkPurchaseStatus(user.id, prompt.id).then((status) => {
+              setPurchaseStatus(status)
+            })
+          }
+          setToast('Payment proof submitted! Seller will verify shortly.')
         }}
       />
     </section>

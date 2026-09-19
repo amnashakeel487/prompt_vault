@@ -177,16 +177,14 @@ export async function getUserPurchases(userId) {
 export async function checkPurchaseStatus(userId, promptId) {
   const { data, error } = await supabase
     .from('purchases')
-    .select('id, status')
+    .select('id, status, payment_method, gateway_transaction_id, gateway_response, created_at')
     .eq('buyer_id', userId)
     .eq('prompt_id', promptId)
-    .single()
+    .maybeSingle()
 
   if (error) {
-    if (error.code === 'PGRST116') { // Not found
-      return null
-    }
-    throw new Error(error.message)
+    console.warn('Error checking purchase status:', error)
+    return null
   }
 
   return data
