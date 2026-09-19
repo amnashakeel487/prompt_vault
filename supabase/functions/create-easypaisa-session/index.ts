@@ -107,14 +107,23 @@ serve(async (req) => {
       )
     }
 
-    // Easypaisa configuration
-    const storeId = Deno.env.get('EASYPAISA_STORE_ID')!
-    const secretKey = Deno.env.get('EASYPAISA_SECRET_KEY')!
+    // Easypaisa configuration (with sandbox defaults if not configured)
+    const storeId = Deno.env.get('EASYPAISA_STORE_ID') || '12345'
+    const secretKey = Deno.env.get('EASYPAISA_SECRET_KEY') || 'testsecret'
     const isLive = Deno.env.get('EASYPAISA_ENVIRONMENT') === 'live'
 
-    // Create purchase record first
+    // Clean up any existing pending/incomplete purchase record for this buyer and prompt
+    await supabaseClient
+      .from('purchases')
+      .delete()
+      .eq('buyer_id', user.user.id)
+      .eq('prompt_id', prompt.id)
+      .neq('status', 'completed')
+
+    // Create purchase record
     const purchaseId = crypto.randomUUID()
     const orderId = `EP${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+    const sellerId = prompt.seller_id || user.user.id
     
     const { error: purchaseError } = await supabaseClient
       .from('purchases')
@@ -122,7 +131,7 @@ serve(async (req) => {
         id: purchaseId,
         buyer_id: user.user.id,
         prompt_id: prompt.id,
-        seller_id: prompt.seller_id,
+        seller_id: sellerId,
         payment_method: 'easypaisa',
         amount: prompt.price,
         currency: 'PKR',
@@ -133,7 +142,10 @@ serve(async (req) => {
     if (purchaseError) {
       console.error('Purchase creation error:', purchaseError)
       return new Response(
-        JSON.stringify({ error: 'Failed to create purchase record' }),
+        JSON.stringify({ 
+          error: `Failed to create purchase record: ${purchaseError.message}`,
+          details: purchaseError 
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
