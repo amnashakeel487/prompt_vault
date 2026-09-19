@@ -59,7 +59,7 @@ serve(async (req) => {
       )
     }
 
-    const { prompt_id } = await req.json()
+    const { prompt_id, test_mode } = await req.json()
 
     if (!prompt_id) {
       return new Response(
@@ -108,12 +108,6 @@ serve(async (req) => {
       )
     }
 
-    // JazzCash configuration (with sandbox defaults if not configured)
-    const merchantId = Deno.env.get('JAZZCASH_MERCHANT_ID') || 'MC12345'
-    const password = Deno.env.get('JAZZCASH_PASSWORD') || 'testpass'
-    const integritySalt = Deno.env.get('JAZZCASH_INTEGRITY_SALT') || 'testsalt'
-    const isLive = Deno.env.get('JAZZCASH_ENVIRONMENT') === 'live'
-
     // Clean up any existing pending/incomplete purchase record for this buyer and prompt
     await supabaseClient
       .from('purchases')
@@ -126,6 +120,46 @@ serve(async (req) => {
     const purchaseId = crypto.randomUUID()
     const txnRefNo = `PV${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
     const sellerId = prompt.seller_id || user.user.id
+
+    // Test mode: complete payment immediately and unlock prompt
+    if (test_mode) {
+      const { error: completeError } = await supabaseClient
+        .from('purchases')
+        .insert([{
+          id: purchaseId,
+          buyer_id: user.user.id,
+          prompt_id: prompt.id,
+          seller_id: sellerId,
+          payment_method: 'jazzcash',
+          amount: prompt.price,
+          currency: 'PKR',
+          status: 'completed',
+          gateway_transaction_id: txnRefNo
+        }])
+
+      if (completeError) {
+        return new Response(
+          JSON.stringify({ error: `Failed to complete test purchase: ${completeError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          test_mode: true,
+          purchase_id: purchaseId,
+          message: 'Payment completed successfully (Test Mode)'
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // JazzCash configuration (with sandbox defaults if not configured)
+    const merchantId = Deno.env.get('JAZZCASH_MERCHANT_ID') || 'MC12345'
+    const password = Deno.env.get('JAZZCASH_PASSWORD') || 'testpass'
+    const integritySalt = Deno.env.get('JAZZCASH_INTEGRITY_SALT') || 'testsalt'
+    const isLive = Deno.env.get('JAZZCASH_ENVIRONMENT') === 'live'
     
     const { error: purchaseError } = await supabaseClient
       .from('purchases')
@@ -152,13 +186,18 @@ serve(async (req) => {
       )
     }
 
-    // JazzCash payment parameters
-    const amount = (prompt.price * 100).toFixed(0) // Convert to paisa (smallest unit)
-    const expiryDateTime = new Date(Date.now() + (30 * 60 * 1000)).toISOString().slice(0, 19).replace(/[-:T]/g, '') // 30 minutes from now
-    
-    const paymentData = {
+    // Helper for PKT datetime (UTC+5) YYYYMMDDHHMMSS
+    const now = new Date(Date.now() + 5 * 60 * 60 * 1000)
+    const expiry = new Date(Date.now() + (5 * 60 + 60) * 60 * 1000)
+    const fmt = (d: Date) => d.toISOString().replace(/[-:T]/g, '').slice(0, 14)
+    const txnDateTime = fmt(now)
+    const expiryDateTime = fmt(expiry)
+    const amount = (prompt.price * 100).toFixed(0) // paisa
+    const origin = req.headers.get('origin') || 'https://prompt-vault-library.vercel.app'
+
+    const paymentData: Record<string, string> = {
       pp_Version: '1.1',
-      pp_TxnType: 'MWALLET', // Mobile Wallet Payment
+      pp_TxnType: '', // Empty for Hosted Merchant Form
       pp_Language: 'EN',
       pp_MerchantID: merchantId,
       pp_SubMerchantID: '',
@@ -168,25 +207,22 @@ serve(async (req) => {
       pp_TxnRefNo: txnRefNo,
       pp_Amount: amount,
       pp_TxnCurrency: 'PKR',
-      pp_TxnDateTime: new Date().toISOString().slice(0, 19).replace(/[-:T]/g, ''),
-      pp_BillReference: purchaseId.substring(0, 20),
-      pp_Description: `PromptVault - ${prompt.title.substring(0, 50)}`,
+      pp_TxnDateTime: txnDateTime,
+      pp_BillReference: `billRef${Date.now().toString().slice(-8)}`,
+      pp_Description: 'PromptVaultPurchase',
       pp_TxnExpiryDateTime: expiryDateTime,
-      pp_ReturnURL: `${req.headers.get('origin')}/api/jazzcash-return`,
-      pp_SecureHash: '', // Will be calculated below
-      ppmpf_1: user.user.id, // Buyer ID
-      ppmpf_2: prompt.id, // Prompt ID
-      ppmpf_3: purchaseId, // Purchase ID
-      ppmpf_4: prompt.seller_id, // Seller ID
-      ppmpf_5: '' // Reserved
+      pp_ReturnURL: `${origin}/prompt/${prompt.id}?payment=success`,
+      pp_SecureHash: '',
+      ppmpf_1: user.user.id,
+      ppmpf_2: prompt.id,
+      ppmpf_3: purchaseId,
+      ppmpf_4: sellerId,
+      ppmpf_5: ''
     }
 
     // Generate secure hash
     paymentData.pp_SecureHash = await generateJazzCashHash(paymentData, integritySalt)
 
-    console.log('JazzCash payment data:', paymentData)
-
-    // Return payment form data for client-side submission
     return new Response(
       JSON.stringify({
         success: true,

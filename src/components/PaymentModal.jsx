@@ -12,6 +12,7 @@ export default function PaymentModal({
   const [selectedMethod, setSelectedMethod] = useState('')
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
+  const [isTestMode, setIsTestMode] = useState(true)
 
   const paymentMethods = [
     {
@@ -54,20 +55,32 @@ export default function PaymentModal({
 
       switch (selectedMethod) {
         case 'stripe':
-          result = await createStripeSession(prompt.id)
-          // Redirect to Stripe Checkout
+          result = await createStripeSession(prompt.id, isTestMode)
+          if (result?.test_mode) {
+            onPaymentSuccess && onPaymentSuccess()
+            onClose()
+            return
+          }
           window.location.href = result.session_url
           break
 
         case 'jazzcash':
-          result = await createJazzCashSession(prompt.id)
-          // Redirect to JazzCash payment page
+          result = await createJazzCashSession(prompt.id, isTestMode)
+          if (result?.test_mode) {
+            onPaymentSuccess && onPaymentSuccess()
+            onClose()
+            return
+          }
           redirectToPaymentGateway(result, 'jazzcash')
           break
 
         case 'easypaisa':
-          result = await createEasypaisaSession(prompt.id)
-          // Redirect to Easypaisa payment page
+          result = await createEasypaisaSession(prompt.id, isTestMode)
+          if (result?.test_mode) {
+            onPaymentSuccess && onPaymentSuccess()
+            onClose()
+            return
+          }
           redirectToPaymentGateway(result, 'easypaisa')
           break
 
@@ -75,10 +88,7 @@ export default function PaymentModal({
           throw new Error('Invalid payment method')
       }
 
-      // For successful session creation, we close the modal
-      // The actual payment completion will be handled by webhooks/callbacks
       onClose()
-
     } catch (err) {
       console.error('Payment initialization failed:', err)
       setError(err.message || 'Payment initialization failed. Please try again.')
@@ -181,6 +191,30 @@ export default function PaymentModal({
                 <span>{error}</span>
               </div>
             )}
+
+            {/* Sandbox Test Mode Switch */}
+            <div className="mb-4 p-3 rounded-xl bg-violet/10 border border-violet/20 flex items-center justify-between gap-3 text-xs">
+              <div>
+                <div className="flex items-center gap-1.5 font-medium text-ink">
+                  <span className="chip !py-0.5 !px-1.5 !text-[10px] !border-violet/40 !bg-violet/25 !text-violet-soft font-semibold">
+                    Sandbox Test Mode
+                  </span>
+                  <span>Instant Checkout</span>
+                </div>
+                <p className="text-[11px] text-ink-muted mt-0.5">
+                  Simulate instant payment & prompt unlock without external bank WAF block
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={isTestMode}
+                  onChange={(e) => setIsTestMode(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet"></div>
+              </label>
+            </div>
 
             {/* Security Notice */}
             <div className="mb-6 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-xs flex items-start gap-2">

@@ -58,7 +58,7 @@ serve(async (req) => {
       )
     }
 
-    const { prompt_id } = await req.json()
+    const { prompt_id, test_mode } = await req.json()
 
     if (!prompt_id) {
       return new Response(
@@ -124,6 +124,40 @@ serve(async (req) => {
     const purchaseId = crypto.randomUUID()
     const orderId = `EP${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
     const sellerId = prompt.seller_id || user.user.id
+
+    // Test mode: complete payment immediately and unlock prompt
+    if (test_mode) {
+      const { error: completeError } = await supabaseClient
+        .from('purchases')
+        .insert([{
+          id: purchaseId,
+          buyer_id: user.user.id,
+          prompt_id: prompt.id,
+          seller_id: sellerId,
+          payment_method: 'easypaisa',
+          amount: prompt.price,
+          currency: 'PKR',
+          status: 'completed',
+          gateway_transaction_id: orderId
+        }])
+
+      if (completeError) {
+        return new Response(
+          JSON.stringify({ error: `Failed to complete test purchase: ${completeError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          test_mode: true,
+          purchase_id: purchaseId,
+          message: 'Payment completed successfully (Test Mode)'
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
     
     const { error: purchaseError } = await supabaseClient
       .from('purchases')

@@ -27,9 +27,9 @@ async function callFunction(functionName, payload) {
   return data
 }
 
-export async function createStripeSession(promptId) {
+export async function createStripeSession(promptId, testMode = false) {
   try {
-    const data = await callFunction('create-stripe-session', { prompt_id: promptId })
+    const data = await callFunction('create-stripe-session', { prompt_id: promptId, test_mode: testMode })
     return data
   } catch (error) {
     console.error('Stripe session creation failed:', error)
@@ -37,9 +37,9 @@ export async function createStripeSession(promptId) {
   }
 }
 
-export async function createJazzCashSession(promptId) {
+export async function createJazzCashSession(promptId, testMode = false) {
   try {
-    const data = await callFunction('create-jazzcash-session', { prompt_id: promptId })
+    const data = await callFunction('create-jazzcash-session', { prompt_id: promptId, test_mode: testMode })
     return data
   } catch (error) {
     console.error('JazzCash session creation failed:', error)
@@ -47,9 +47,9 @@ export async function createJazzCashSession(promptId) {
   }
 }
 
-export async function createEasypaisaSession(promptId) {
+export async function createEasypaisaSession(promptId, testMode = false) {
   try {
-    const data = await callFunction('create-easypaisa-session', { prompt_id: promptId })
+    const data = await callFunction('create-easypaisa-session', { prompt_id: promptId, test_mode: testMode })
     return data
   } catch (error) {
     console.error('Easypaisa session creation failed:', error)
